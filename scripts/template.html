@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NASDAQ 50 — Market Intelligence Dashboard</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page:        #f9f9f7;
+    --surface:     #fcfcfb;
+    --surface-2:   #f3f2ee;
+    --ink:         #0b0b0b;
+    --ink-2:       #52514e;
+    --muted:       #898781;
+    --grid:        #e1e0d9;
+    --baseline:    #c3c2b7;
+    --border:      rgba(11,11,11,0.10);
+    --good:        #0ca30c;
+    --critical:    #d03b3b;
+    --warning:     #fab219;
+    --div-blue:    #2a78d6;
+    --div-red:     #d03b3b;
+    --sec-1:       #2a78d6;  /* Technology */
+    --sec-2:       #008300;  /* Consumer Cyclical */
+    --sec-3:       #e87ba4;  /* Communication Services */
+    --sec-4:       #eda100;  /* Healthcare */
+    --sec-other:   #898781;
+    --accent:      #2a78d6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --page:      #0d0d0d;
+      --surface:   #1a1a19;
+      --surface-2: #222220;
+      --ink:       #ffffff;
+      --ink-2:     #c3c2b7;
+      --muted:     #898781;
+      --grid:      #2c2c2a;
+      --baseline:  #383835;
+      --border:    rgba(255,255,255,0.10);
+      --good:      #0ca30c;
+      --critical:  #d03b3b;
+      --warning:   #fab219;
+      --div-blue:  #3987e5;
+      --div-red:   #e66767;
+      --sec-1:     #3987e5;
+      --sec-2:     #008300;
+      --sec-3:     #d55181;
+      --sec-4:     #c98500;
+      --sec-other: #898781;
+      --accent:    #3987e5;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page:      #0d0d0d;
+    --surface:   #1a1a19;
+    --surface-2: #222220;
+    --ink:       #ffffff;
+    --ink-2:     #c3c2b7;
+    --muted:     #898781;
+    --grid:      #2c2c2a;
+    --baseline:  #383835;
+    --border:    rgba(255,255,255,0.10);
+    --good:      #0ca30c;
+    --critical:  #d03b3b;
+    --warning:   #fab219;
+    --div-blue:  #3987e5;
+    --div-red:   #e66767;
+    --sec-1:     #3987e5;
+    --sec-2:     #008300;
+    --sec-3:     #d55181;
+    --sec-4:     #c98500;
+    --sec-other: #898781;
+    --accent:    #3987e5;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--page);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  body { overflow-x: hidden; }
+  .wrap { max-width: 1360px; margin: 0 auto; padding: 28px 24px 80px; }
+
+  /* Masthead */
+  .masthead { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px; padding-bottom: 20px; }
+  .masthead h1 { margin: 0 0 4px; font-size: 26px; font-weight: 700; letter-spacing: -0.01em; }
+  .masthead p { margin: 0; color: var(--ink-2); font-size: 13.5px; }
+  .eyebrow { display: block; text-transform: uppercase; letter-spacing: 0.08em; font-size: 10.5px; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+  .asof { text-align: right; font-size: 12px; color: var(--muted); }
+  .asof b { display:block; font-size: 15px; color: var(--ink); }
+
+  /* Filter bar */
+  .filterbar {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 14px; margin: 4px 0 28px; position: sticky; top: 10px; z-index: 20;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  }
+  .filterbar input[type="text"], .filterbar select {
+    background: var(--surface-2); color: var(--ink); border: 1px solid var(--border);
+    border-radius: 7px; padding: 7px 10px; font-size: 13px; font-family: inherit;
+  }
+  .filterbar input[type="text"] { width: 190px; }
+  .filterbar label.chk { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); cursor: pointer; }
+  .filterbar .fb-label { font-size: 11px; color: var(--muted); margin-right: -4px; }
+  .filterbar button {
+    margin-left: auto; background: transparent; border: 1px solid var(--border); color: var(--ink-2);
+    border-radius: 7px; padding: 7px 12px; font-size: 12.5px; cursor: pointer; font-family: inherit;
+  }
+  .filterbar button:hover { background: var(--surface-2); }
+  .filter-count { font-size: 12px; color: var(--muted); white-space: nowrap; }
+
+  /* Period bar */
+  .periodbar {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 14px; margin: 0 0 28px;
+  }
+  .periodbar .fb-label { font-size: 11px; color: var(--muted); }
+  .custom-range { display: flex; align-items: center; gap: 6px; }
+  .custom-range input[type="date"] {
+    background: var(--surface-2); color: var(--ink); border: 1px solid var(--border);
+    border-radius: 7px; padding: 6px 8px; font-size: 12.5px; font-family: inherit;
+  }
+  .custom-range button {
+    background: var(--accent); color: #fff; border: none; border-radius: 7px;
+    padding: 6px 12px; font-size: 12.5px; cursor: pointer; font-family: inherit; font-weight: 600;
+  }
+  .period-summary { margin-left: auto; font-size: 12.5px; color: var(--ink-2); font-weight: 600; }
+
+  /* Section chrome */
+  .section { margin-bottom: 40px; }
+  .section-title { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+  .section-title h2 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.005em; }
+  .section-title .q { font-size: 12.5px; color: var(--muted); font-style: italic; }
+  .section-sub { margin: 2px 0 14px; font-size: 12.5px; color: var(--muted); }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .grid-8 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+
+  .panel {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px 18px 12px; min-width: 0;
+  }
+  .panel h3 { margin: 0 0 2px; font-size: 13px; font-weight: 600; }
+  .panel .sub { margin: 0 0 10px; font-size: 11.5px; color: var(--muted); }
+  .panel svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .axis-label { fill: var(--muted); font-size: 9.5px; }
+  .gridline { stroke: var(--grid); stroke-width: 1; }
+  .baseline-line { stroke: var(--baseline); stroke-width: 1; }
+
+  /* KPI tiles */
+  .kpi { position: relative; }
+  .kpi .label { font-size: 11px; color: var(--ink-2); margin: 0 0 8px; line-height: 1.3; min-height: 28px; }
+  .kpi .value { font-size: 24px; font-weight: 700; letter-spacing: -0.01em; }
+  .kpi .value.good { color: var(--good); }
+  .kpi .value.bad { color: var(--critical); }
+  .kpi .sub2 { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+  .bar-up { fill: var(--good); }
+  .bar-down { fill: var(--critical); }
+  .bar-hit { fill: transparent; cursor: pointer; }
+  .bar-hit:hover + .bar-visual { opacity: 0.72; }
+  .bar-visual { transition: opacity 0.1s ease; }
+  .hist-bar { transition: opacity 0.1s ease; }
+  .hist-hit:hover + .hist-bar { opacity: 0.72; }
+
+  .trend-area { opacity: 0.10; }
+  .trend-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .crosshair { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 2 2; opacity: 0; pointer-events: none; }
+  .hover-dot { opacity: 0; pointer-events: none; }
+
+  /* Tooltip */
+  .tooltip {
+    position: fixed; z-index: 90; pointer-events: none;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+    opacity: 0; transform: translate(-50%, -100%); transition: opacity 0.08s ease;
+    white-space: nowrap; max-width: 260px;
+  }
+  .tooltip.show { opacity: 1; }
+  .tooltip .t-date { color: var(--ink-2); font-size: 11px; margin-bottom: 4px; font-weight: 600; }
+  .tooltip .t-row { display: flex; align-items: center; gap: 6px; }
+  .tooltip .t-key { width: 10px; height: 2px; border-radius: 1px; flex: none; }
+  .tooltip .t-val { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .tooltip .t-name { color: var(--ink-2); }
+
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11.5px; color: var(--ink-2); margin-bottom: 8px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-dot { width: 9px; height: 9px; border-radius: 2px; flex: none; }
+
+  /* Treemap / heatmap cells */
+  .tm-cell rect { stroke: var(--surface); stroke-width: 2; }
+  .tm-cell text { font-size: 10px; font-weight: 600; pointer-events: none; }
+  .tm-cell .tm-sub { font-size: 8.5px; font-weight: 400; }
+
+  /* Company table */
+  table.dtable { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.dtable th {
+    text-align: left; padding: 8px 10px; color: var(--muted); font-weight: 600; font-size: 10.5px;
+    text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid var(--border); cursor: pointer;
+    white-space: nowrap; user-select: none;
+  }
+  table.dtable th:hover { color: var(--ink); }
+  table.dtable th.sorted::after { content: " " attr(data-dir); font-size: 9px; }
+  table.dtable td { padding: 7px 10px; border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  table.dtable tbody tr { cursor: pointer; }
+  table.dtable tbody tr:hover { background: var(--surface-2); }
+  table.dtable tbody tr.selected { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+  .pos { color: var(--good); font-weight: 600; }
+  .neg { color: var(--critical); font-weight: 600; }
+  .sector-chip {
+    display: inline-block; padding: 2px 7px; border-radius: 20px; font-size: 10.5px;
+    background: var(--surface-2); color: var(--ink-2); border: 1px solid var(--border);
+  }
+  .table-wrap { overflow-x: auto; }
+  .table-scroll { max-height: 560px; overflow-y: auto; }
+
+  /* Detail / drill-through */
+  .detail-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
+  .detail-select { display: flex; align-items: center; gap: 8px; }
+  .detail-select select, .detail-select input {
+    background: var(--surface-2); color: var(--ink); border: 1px solid var(--border); border-radius: 7px;
+    padding: 7px 10px; font-size: 13px; font-family: inherit;
+  }
+  .range-toggle { display: flex; gap: 4px; background: var(--surface-2); border-radius: 8px; padding: 3px; }
+  .range-toggle button {
+    border: none; background: transparent; color: var(--ink-2); font-size: 12px; font-family: inherit;
+    padding: 5px 11px; border-radius: 6px; cursor: pointer;
+  }
+  .range-toggle button.active { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+  .ma-toggle { display: flex; gap: 12px; }
+  .ma-toggle label { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--ink-2); cursor: pointer; }
+  .detail-name { margin-left: auto; text-align: right; }
+  .detail-name .tk { font-size: 20px; font-weight: 700; }
+  .detail-name .nm { font-size: 12.5px; color: var(--ink-2); }
+
+  .ratio-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 12px; }
+  .ratio-tile { background: var(--surface); border: 1px solid var(--border); border-radius: 9px; padding: 11px 13px; }
+  .ratio-tile .rl { font-size: 10.5px; color: var(--muted); margin-bottom: 5px; }
+  .ratio-tile .rv { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  .detail-charts { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; }
+  .detail-sub-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+
+  footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+
+  @media (max-width: 1080px) {
+    .grid-2, .grid-3, .grid-4, .grid-8 { grid-template-columns: repeat(2, 1fr); }
+    .detail-charts, .detail-sub-charts { grid-template-columns: 1fr; }
+    .ratio-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+  @media (max-width: 640px) {
+    .grid-2, .grid-3, .grid-4, .grid-8, .ratio-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="masthead">
+    <div>
+      <span class="eyebrow">Equities · Analyst Dashboard</span>
+      <h1>NASDAQ 50 — Market Intelligence</h1>
+      <p>Top 50 NASDAQ-listed companies by market cap · 5-year daily history</p>
+    </div>
+    <div class="asof">As of<b id="asof-date">—</b></div>
+  </div>
+
+  <div class="filterbar">
+    <span class="fb-label">Search</span>
+    <input type="text" id="f-search" placeholder="Ticker or company…" />
+    <span class="fb-label">Sector</span>
+    <select id="f-sector"></select>
+    <span class="fb-label">Market cap</span>
+    <select id="f-cap">
+      <option value="All">All</option>
+      <option value="Mega">Mega (≥$1T)</option>
+      <option value="Large">Large ($200B–$1T)</option>
+      <option value="Mid">Mid (&lt;$200B)</option>
+    </select>
+    <span class="fb-label">P/E</span>
+    <select id="f-pe">
+      <option value="All">All</option>
+      <option value="lt20">&lt; 20</option>
+      <option value="20-30">20 – 30</option>
+      <option value="30-50">30 – 50</option>
+      <option value="gt50">&gt; 50</option>
+    </select>
+    <label class="chk"><input type="checkbox" id="f-div" /> Dividend payers only</label>
+    <span class="filter-count" id="filter-count"></span>
+    <button id="f-reset">Reset filters</button>
+  </div>
+
+  <div class="periodbar">
+    <span class="fb-label">Reporting period</span>
+    <div class="range-toggle" id="period-toggle">
+      <button data-period="1D" class="active">Latest day</button>
+      <button data-period="1M">Last month</button>
+      <button data-period="3M">3M</button>
+      <button data-period="YTD">YTD</button>
+      <button data-period="1Y">1Y</button>
+      <button data-period="5Y">5Y</button>
+      <button data-period="custom">Custom</button>
+    </div>
+    <div class="custom-range" id="period-custom-wrap" style="display:none;">
+      <input type="date" id="period-from" /><span style="color:var(--muted)">–</span><input type="date" id="period-to" />
+      <button id="period-custom-apply">Apply</button>
+    </div>
+    <span class="period-summary" id="period-summary"></span>
+  </div>
+
+  <!-- 1. KPI ROW -->
+  <div class="section">
+    <div class="section-title"><h2>Market Snapshot</h2><span class="q">How is the market performing over the selected period?</span></div>
+    <div class="grid-8" id="kpi-row"></div>
+  </div>
+
+  <!-- 2. PERFORMANCE -->
+  <div class="section">
+    <div class="section-title"><h2>Performance</h2><span class="q">Which companies drove the selected period?</span></div>
+    <div class="grid-2" style="margin-bottom:12px;">
+      <div class="panel"><h3>Top 10 gainers</h3><p class="sub" id="gainers-sub">Period return</p><div id="gainers"></div></div>
+      <div class="panel"><h3>Top 10 losers</h3><p class="sub" id="losers-sub">Period return</p><div id="losers"></div></div>
+    </div>
+    <div class="panel">
+      <h3>Market cap heatmap</h3><p class="sub" id="heatmap-sub">Tile size = market cap · color = period return</p>
+      <div class="legend" id="heatmap-legend"></div>
+      <div id="heatmap"></div>
+    </div>
+  </div>
+
+  <!-- 3. SECTOR ANALYSIS -->
+  <div class="section">
+    <div class="section-title"><h2>Sector Analysis</h2><span class="q">Which sector is strongest — and weakest?</span></div>
+    <div class="grid-2">
+      <div class="panel"><h3>Average daily return by sector</h3><p class="sub">Equal-weighted mean of constituent returns</p><div id="sector-bar"></div></div>
+      <div class="panel"><h3>Sector allocation</h3><p class="sub">Share of total market cap</p><div class="legend" id="sector-tm-legend"></div><div id="sector-treemap"></div></div>
+    </div>
+  </div>
+
+  <!-- 4. RISK ANALYSIS -->
+  <div class="section">
+    <div class="section-title"><h2>Risk Analysis</h2><span class="q">Where is risk concentrated?</span></div>
+    <div class="grid-2">
+      <div class="panel"><h3>Highest volatility names</h3><p class="sub">Annualized, trailing 1-year daily returns</p><div id="risk-table"></div></div>
+      <div class="panel"><h3>Nasdaq Composite — 30-day rolling volatility</h3><p class="sub">Annualized, trailing 30 sessions</p><div id="rolling-vol"></div></div>
+    </div>
+  </div>
+
+  <!-- 5. VALUATION -->
+  <div class="section">
+    <div class="section-title"><h2>Valuation</h2><span class="q">Which stocks look expensive or cheap?</span></div>
+    <div class="panel">
+      <h3>P/E ratio vs. market cap</h3><p class="sub">Bubble size = dollar volume over selected period · color = sector</p>
+      <div class="legend" id="scatter-legend"></div>
+      <div id="valuation-scatter"></div>
+    </div>
+  </div>
+
+  <!-- 6. TRADING ACTIVITY -->
+  <div class="section">
+    <div class="section-title"><h2>Trading Activity</h2><span class="q">Are trading patterns changing?</span></div>
+    <div class="grid-3">
+      <div class="panel"><h3>Top volume (shares)</h3><p class="sub" id="top-volume-sub">Selected period</p><div id="top-volume"></div></div>
+      <div class="panel"><h3>Top dollar volume</h3><p class="sub">Price × shares traded, selected period</p><div id="top-dollar-volume"></div></div>
+      <div class="panel"><h3>Unusual volume</h3><p class="sub">Avg. daily volume in period vs. 3-month average</p><div id="unusual-volume"></div></div>
+    </div>
+  </div>
+
+  <!-- 7. CORRELATION -->
+  <div class="section">
+    <div class="section-title"><h2>Correlation Matrix</h2><span class="q">Where are the diversification opportunities?</span></div>
+    <div class="panel">
+      <h3>Pairwise return correlation</h3><p class="sub">Trailing 1-year daily returns</p>
+      <div class="legend" id="corr-legend"></div>
+      <div class="table-wrap" id="corr-matrix"></div>
+    </div>
+  </div>
+
+  <!-- 8. RETURNS DISTRIBUTION + CAGR/VOL -->
+  <div class="section">
+    <div class="section-title"><h2>Returns &amp; Risk-Adjusted Performance</h2><span class="q">How wide is today's dispersion — and who compounds best per unit of risk?</span></div>
+    <div class="grid-2">
+      <div class="panel"><h3>Returns distribution</h3><p class="sub" id="hist-sub">Period return, all constituents</p><div id="returns-hist"></div></div>
+      <div class="panel"><h3>CAGR vs. volatility</h3><p class="sub">5-year CAGR · bubble size = market cap · color = sector</p><div class="legend" id="cagr-legend"></div><div id="cagr-scatter"></div></div>
+    </div>
+  </div>
+
+  <!-- 9. COMPANY DETAIL / DRILL-THROUGH -->
+  <div class="section" id="detail-section">
+    <div class="section-title"><h2>Company Detail</h2><span class="q">Select a company, or click any ticker above, to drill in</span></div>
+    <div class="panel">
+      <div class="detail-head">
+        <div class="detail-select">
+          <select id="d-ticker"></select>
+        </div>
+        <div class="range-toggle" id="d-range">
+          <button data-range="1M">1M</button>
+          <button data-range="3M">3M</button>
+          <button data-range="YTD">YTD</button>
+          <button data-range="1Y" class="active">1Y</button>
+          <button data-range="5Y">5Y</button>
+        </div>
+        <div class="ma-toggle">
+          <label><input type="checkbox" class="d-ma" value="20" checked /> SMA 20</label>
+          <label><input type="checkbox" class="d-ma" value="50" checked /> SMA 50</label>
+          <label><input type="checkbox" class="d-ma" value="200" /> SMA 200</label>
+          <label><input type="checkbox" id="d-bb" /> Bollinger</label>
+        </div>
+        <div class="detail-name"><div class="tk" id="d-tk"></div><div class="nm" id="d-nm"></div></div>
+      </div>
+      <div class="ratio-grid" id="d-ratios"></div>
+      <div class="detail-charts">
+        <div><h3 style="font-size:13px;margin:0 0 8px;">Price &amp; moving averages</h3><div id="d-price"></div></div>
+        <div><h3 style="font-size:13px;margin:0 0 8px;">Volume</h3><div id="d-volume"></div></div>
+      </div>
+      <div class="detail-sub-charts">
+        <div class="panel"><h3>RSI (14)</h3><p class="sub">&lt;30 oversold · &gt;70 overbought</p><div id="d-rsi"></div></div>
+        <div class="panel"><h3>MACD (12, 26, 9)</h3><p class="sub">Trend &amp; momentum crossover</p><div id="d-macd"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 10. COMPANY TABLE -->
+  <div class="section">
+    <div class="section-title"><h2>Company Detail Table</h2><span class="q">Which companies deserve deeper investigation?</span></div>
+    <div class="panel">
+      <div class="table-wrap table-scroll">
+        <table class="dtable" id="company-table">
+          <thead><tr>
+            <th data-key="symbol">Ticker</th><th data-key="name">Company</th><th data-key="sector">Sector</th>
+            <th data-key="close">Price</th><th data-key="ret">Return</th><th data-key="marketCap">Market Cap</th>
+            <th data-key="volume">Volume</th><th data-key="pe">P/E</th><th data-key="beta">Beta</th>
+            <th data-key="high52dist">52W High</th>
+          </tr></thead>
+          <tbody id="company-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <span>Source: Yahoo Finance daily OHLCV &amp; fundamentals (via yfinance)</span>
+    <span>Risk-free rate assumption for Sharpe: 4.0% · Daily return = close-over-close</span>
+  </footer>
+
+</div>
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+const DATA = __DATA_JSON__;
+const RISK_FREE = 0.04, TDAYS = 252;
+const SVGNS = "http://www.w3.org/2000/svg";
+const TOP_SECTORS = ["Technology", "Consumer Cyclical", "Communication Services", "Healthcare"];
+const SECTOR_VAR = { "Technology": "--sec-1", "Consumer Cyclical": "--sec-2", "Communication Services": "--sec-3", "Healthcare": "--sec-4" };
+
+/* ---------------- helpers ---------------- */
+const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const el = (tag, attrs) => { const e = document.createElementNS(SVGNS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+const fmtPct = (v, d=2) => (v == null || isNaN(v)) ? "—" : (v > 0 ? "+" : "") + v.toFixed(d) + "%";
+const fmtUsd = (v, d=2) => (v == null || isNaN(v)) ? "—" : "$" + v.toFixed(d);
+const fmtCompact = (v) => {
+  if (v == null || isNaN(v)) return "—";
+  const abs = Math.abs(v);
+  if (abs >= 1e12) return "$" + (v/1e12).toFixed(2) + "T";
+  if (abs >= 1e9) return "$" + (v/1e9).toFixed(1) + "B";
+  if (abs >= 1e6) return "$" + (v/1e6).toFixed(1) + "M";
+  return "$" + v.toFixed(0);
+};
+const fmtShares = (v) => {
+  if (v == null || isNaN(v)) return "—";
+  if (v >= 1e9) return (v/1e9).toFixed(2) + "B";
+  if (v >= 1e6) return (v/1e6).toFixed(1) + "M";
+  if (v >= 1e3) return (v/1e3).toFixed(0) + "K";
+  return String(v);
+};
+const fmtDate = (iso) => { const d = new Date(iso + "T00:00:00"); return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); };
+const sectorColor = (sector) => SECTOR_VAR[sector] ? cssVar(SECTOR_VAR[sector]) : cssVar("--sec-other");
+
+const tooltip = document.getElementById("tooltip");
+function showTooltip(x, y, node) { tooltip.innerHTML = ""; tooltip.appendChild(node); tooltip.style.left = x + "px"; tooltip.style.top = (y - 12) + "px"; tooltip.classList.add("show"); }
+function hideTooltip() { tooltip.classList.remove("show"); }
+function ttRow(color, name, value) {
+  const row = document.createElement("div"); row.className = "t-row";
+  const key = document.createElement("span"); key.className = "t-key"; key.style.background = color;
+  const val = document.createElement("span"); val.className = "t-val"; val.textContent = value;
+  const nm = document.createElement("span"); nm.className = "t-name"; nm.textContent = name;
+  row.append(key, val, nm); return row;
+}
+function ttHead(text) { const d = document.createElement("div"); d.className = "t-date"; d.textContent = text; return d; }
+
+/* ---------------- analytics engine ---------------- */
+function dailyReturns(close) {
+  const r = new Array(close.length - 1);
+  for (let i = 1; i < close.length; i++) r[i-1] = close[i] / close[i-1] - 1;
+  return r;
+}
+function mean(arr) { return arr.reduce((a,b) => a+b, 0) / arr.length; }
+function stdev(arr) {
+  const m = mean(arr);
+  return Math.sqrt(arr.reduce((a,b) => a + (b-m)*(b-m), 0) / (arr.length - 1));
+}
+function sma(close, w) {
+  const out = new Array(close.length).fill(null);
+  let sum = 0;
+  for (let i = 0; i < close.length; i++) {
+    sum += close[i];
+    if (i >= w) sum -= close[i-w];
+    if (i >= w - 1) out[i] = sum / w;
+  }
+  return out;
+}
+function ema(close, w) {
+  const out = new Array(close.length).fill(null);
+  const k = 2 / (w + 1);
+  let prev = null;
+  for (let i = 0; i < close.length; i++) {
+    if (prev === null) {
+      if (i === w - 1) { prev = mean(close.slice(0, w)); out[i] = prev; }
+    } else {
+      prev = close[i] * k + prev * (1 - k);
+      out[i] = prev;
+    }
+  }
+  return out;
+}
+function rsi(close, period=14) {
+  const out = new Array(close.length).fill(null);
+  let gainSum = 0, lossSum = 0;
+  for (let i = 1; i <= period; i++) {
+    const d = close[i] - close[i-1];
+    if (d >= 0) gainSum += d; else lossSum -= d;
+  }
+  let avgGain = gainSum / period, avgLoss = lossSum / period;
+  out[period] = 100 - 100 / (1 + (avgLoss === 0 ? Infinity : avgGain/avgLoss));
+  for (let i = period + 1; i < close.length; i++) {
+    const d = close[i] - close[i-1];
+    const gain = d > 0 ? d : 0, loss = d < 0 ? -d : 0;
+    avgGain = (avgGain * (period - 1) + gain) / period;
+    avgLoss = (avgLoss * (period - 1) + loss) / period;
+    out[i] = 100 - 100 / (1 + (avgLoss === 0 ? Infinity : avgGain/avgLoss));
+  }
+  return out;
+}
+function macd(close) {
+  const e12 = ema(close, 12), e26 = ema(close, 26);
+  const macdLine = close.map((_, i) => (e12[i] != null && e26[i] != null) ? e12[i] - e26[i] : null);
+  const firstValid = macdLine.findIndex(v => v != null);
+  const compact = macdLine.slice(firstValid).map(v => v);
+  const sigCompact = ema(compact, 9);
+  const signal = new Array(close.length).fill(null);
+  for (let i = 0; i < sigCompact.length; i++) signal[firstValid + i] = sigCompact[i];
+  const hist = close.map((_, i) => (macdLine[i] != null && signal[i] != null) ? macdLine[i] - signal[i] : null);
+  return { macd: macdLine, signal, hist };
+}
+function bollinger(close, w=20, mult=2) {
+  const mid = sma(close, w);
+  const upper = new Array(close.length).fill(null), lower = new Array(close.length).fill(null);
+  for (let i = w - 1; i < close.length; i++) {
+    const win = close.slice(i - w + 1, i + 1);
+    const sd = stdev(win);
+    upper[i] = mid[i] + mult * sd;
+    lower[i] = mid[i] - mult * sd;
+  }
+  return { mid, upper, lower };
+}
+function rollingVol(returns, w=30) {
+  const out = new Array(returns.length).fill(null);
+  for (let i = w - 1; i < returns.length; i++) {
+    out[i] = stdev(returns.slice(i - w + 1, i + 1)) * Math.sqrt(TDAYS) * 100;
+  }
+  return out;
+}
+function correlation(a, b) {
+  const n = Math.min(a.length, b.length);
+  const A = a.slice(-n), B = b.slice(-n);
+  const ma = mean(A), mb = mean(B);
+  let num = 0, da = 0, db = 0;
+  for (let i = 0; i < n; i++) { num += (A[i]-ma)*(B[i]-mb); da += (A[i]-ma)**2; db += (B[i]-mb)**2; }
+  return num / Math.sqrt(da*db);
+}
+function maxDrawdown(close) {
+  let peak = close[0], mdd = 0;
+  for (const c of close) { if (c > peak) peak = c; const dd = (c - peak) / peak; if (dd < mdd) mdd = dd; }
+  return mdd * 100;
+}
+function cagrCalc(close, dates) {
+  const days = (new Date(dates[dates.length-1]) - new Date(dates[0])) / 86400000;
+  return (Math.pow(close[close.length-1] / close[0], 365/days) - 1) * 100;
+}
+function sharpeCalc(ret1y) { return (mean(ret1y)*TDAYS - RISK_FREE) / (stdev(ret1y)*Math.sqrt(TDAYS)); }
+function betaCalc(retStock, retBench) {
+  const n = Math.min(retStock.length, retBench.length);
+  const S = retStock.slice(-n), B = retBench.slice(-n);
+  const mb = mean(B);
+  let cov = 0, varB = 0;
+  const ms = mean(S);
+  for (let i = 0; i < n; i++) { cov += (S[i]-ms)*(B[i]-mb); varB += (B[i]-mb)**2; }
+  return cov / varB;
+}
+
+/* ---------------- precompute per-ticker metrics ---------------- */
+const TICKERS = Object.keys(DATA.stocks);
+const benchClose = DATA.benchmark.close;
+const benchRet = dailyReturns(benchClose);
+const benchRet1y = benchRet.slice(-TDAYS);
+
+const M = {}; // metrics per ticker
+TICKERS.forEach(t => {
+  const s = DATA.stocks[t];
+  const close = s.close, volume = s.volume;
+  const ret = dailyReturns(close);
+  const ret1y = ret.slice(-TDAYS);
+  const N = close.length;
+  const latestReturn = ret[ret.length-1] * 100;
+  const vol1y = stdev(ret1y) * Math.sqrt(TDAYS) * 100;
+  const sharpe1y = sharpeCalc(ret1y);
+  const betaV = betaCalc(ret1y, benchRet1y);
+  const mdd = maxDrawdown(close);
+  const cagrV = cagrCalc(close, DATA.dates);
+  const lookback = Math.min(TDAYS, N-1);
+  const momentum = (close[N-1] / close[N-1-lookback] - 1) * 100;
+  const high52 = s.fiftyTwoWeekHigh;
+  const high52dist = high52 ? (close[N-1] - high52) / high52 * 100 : null;
+  const todayVolume = volume[N-1];
+  const dollarVolume = todayVolume * close[N-1];
+  const avgVolume = s.averageVolume;
+  const unusualRatio = avgVolume ? todayVolume / avgVolume : null;
+  M[t] = { latestReturn, vol1y, sharpe1y, beta: betaV, mdd, cagr: cagrV, momentum, high52dist,
+           todayVolume, dollarVolume, unusualRatio, close: close[N-1], ret, ret1y };
+});
+
+/* ---------------- filter state ---------------- */
+const state = { search: "", sector: "All", cap: "All", pe: "All", divOnly: false, selectedTicker: "NVDA" };
+
+function capTier(mc) { if (mc >= 1e12) return "Mega"; if (mc >= 2e11) return "Large"; return "Mid"; }
+function peBucket(pe) {
+  if (pe == null) return null;
+  if (pe < 20) return "lt20"; if (pe < 30) return "20-30"; if (pe < 50) return "30-50"; return "gt50";
+}
+function getFiltered() {
+  const q = state.search.trim().toLowerCase();
+  return TICKERS.filter(t => {
+    const s = DATA.stocks[t];
+    if (q && !(t.toLowerCase().includes(q) || s.name.toLowerCase().includes(q))) return false;
+    if (state.sector !== "All" && s.sector !== state.sector) return false;
+    if (state.cap !== "All" && capTier(s.marketCap) !== state.cap) return false;
+    if (state.pe !== "All" && peBucket(s.trailingPE) !== state.pe) return false;
+    if (state.divOnly && !(s.dividendYield && s.dividendYield > 0)) return false;
+    return true;
+  });
+}
+
+/* ---------------- chart primitives ---------------- */
+function hBarChart(container, items, opts) {
+  container.innerHTML = "";
+  const W = 460, rowH = 26, padL = 8, padR = 56, labelW = 96;
+  const H = items.length * rowH + 10;
+  const innerW = W - padL - padR - labelW;
+  const maxAbs = Math.max(0.001, ...items.map(d => Math.abs(d.value)));
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}` });
+  const neutral = !!opts.barColor;
+  items.forEach((d, i) => {
+    const y = i * rowH + 5;
+    const w = Math.max(1, (Math.abs(d.value) / maxAbs) * innerW);
+    const isPos = d.value >= 0;
+    const x0 = padL + labelW;
+    const barX = x0;
+    const rad = Math.min(4, rowH*0.55);
+    const bh = rowH * 0.62;
+    const by = y + (rowH - bh)/2 - 5;
+    const valueColor = neutral ? "var(--ink)" : (isPos ? "var(--good)" : "var(--critical)");
+    const rectAttrs = { x: barX, y: by, width: w, height: bh, rx: rad, ry: rad };
+    if (neutral) { rectAttrs.class = "bar-visual"; rectAttrs.fill = opts.barColor; }
+    else rectAttrs.class = isPos ? "bar-visual bar-up" : "bar-visual bar-down";
+    const rect = el("rect", rectAttrs);
+    const label = el("text", { x: padL, y: y+4, class: "axis-label", style: "font-size:10.5px;font-weight:600;fill:var(--ink)" });
+    label.textContent = d.label;
+    const valText = el("text", { x: barX + w + 6, y: y+4, class: "axis-label",
+      "text-anchor": "start", style: `font-weight:700;fill:${valueColor}` });
+    valText.textContent = (opts.fmt || fmtPct)(d.value);
+    const hit = el("rect", { x: padL, y: y-8, width: W-padL-padR+labelW+40, height: rowH, class: "bar-hit" });
+    hit.addEventListener("pointerenter", () => {
+      const r = hit.getBoundingClientRect();
+      const box = document.createElement("div");
+      box.appendChild(ttHead(d.label + (d.sub ? " — " + d.sub : "")));
+      box.appendChild(ttRow(neutral ? opts.barColor : (isPos ? cssVar("--good") : cssVar("--critical")), opts.name || "Value", (opts.fmt || fmtPct)(d.value)));
+      showTooltip(r.left + r.width/2, r.top, box);
+    });
+    hit.addEventListener("pointerleave", hideTooltip);
+    hit.addEventListener("click", () => { if (d.ticker) selectTicker(d.ticker); });
+    svg.append(rect, label, valText, hit);
+  });
+  container.appendChild(svg);
+}
+
+function renderHistogram(container, values) {
+  container.innerHTML = "";
+  const W = 620, H = 220, padL = 30, padR = 8, padT = 14, padB = 26;
+  const innerW = W - padL - padR, innerH = H - padT - padB;
+  const maxAbs = Math.max(0.5, ...values.map(v => Math.abs(v)));
+  const step = maxAbs > 6 ? 1 : 0.5;
+  const edge = Math.ceil(maxAbs/step)*step;
+  const bins = [];
+  for (let e0 = -edge; e0 < edge - 1e-9; e0 += step) bins.push({ lo: e0, hi: e0+step, count: 0 });
+  values.forEach(v => { let idx = Math.floor((v+edge)/step); idx = Math.max(0, Math.min(bins.length-1, idx)); bins[idx].count++; });
+  const maxCount = Math.max(1, ...bins.map(b=>b.count));
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}` });
+  const y0 = H - padB;
+  [0, Math.ceil(maxCount/2), maxCount].forEach(v => {
+    const y = y0 - (v/maxCount)*innerH;
+    svg.appendChild(el("line", { class: "gridline", x1: padL, x2: W-padR, y1: y, y2: y }));
+    const t = el("text", { class: "axis-label", x: padL-5, y: y+3, "text-anchor": "end" }); t.textContent = v;
+    svg.appendChild(t);
+  });
+  const bw = innerW / bins.length;
+  bins.forEach((b, i) => {
+    const x = padL + i*bw, h = (b.count/maxCount)*innerH, y = y0-h, rad = Math.min(4,h), bw2 = bw-3;
+    const isPos = b.lo >= 0;
+    let d = h > 0 ? `M${x},${y0} L${x},${y+rad} Q${x},${y} ${x+rad},${y} L${x+bw2-rad},${y} Q${x+bw2},${y} ${x+bw2},${y+rad} L${x+bw2},${y0} Z` : `M${x},${y0} L${x+bw2},${y0} Z`;
+    svg.appendChild(el("path", { d, class: "hist-bar " + (isPos?"bar-up":"bar-down") }));
+    const hit = el("rect", { class: "hist-hit bar-hit", x, y: padT, width: bw2+4, height: innerH });
+    hit.addEventListener("pointerenter", () => {
+      const r = hit.getBoundingClientRect();
+      const box = document.createElement("div");
+      box.appendChild(ttHead(fmtPct(b.lo)+" to "+fmtPct(b.hi)));
+      box.appendChild(ttRow(isPos?cssVar("--good"):cssVar("--critical"), "Stocks", b.count));
+      showTooltip(r.left+r.width/2, r.top, box);
+    });
+    hit.addEventListener("pointerleave", hideTooltip);
+    svg.appendChild(hit);
+    if (i % 2 === 0) { const t = el("text", { class: "axis-label", x: x+bw2/2, y: H-8, "text-anchor": "middle" }); t.textContent = b.lo.toFixed(1); svg.appendChild(t); }
+  });
+  container.appendChild(svg);
+}
+
+function renderLineChart(container, dates, series, opts={}) {
+  container.innerHTML = "";
+  const W = opts.w || 700, H = opts.h || 200, padL = 42, padR = 14, padT = 14, padB = 20;
+  const innerW = W - padL - padR, innerH = H - padT - padB;
+  const allVals = series.flatMap(s => s.values.filter(v => v != null));
+  let lo = Math.min(...allVals), hi = Math.max(...allVals);
+  if (opts.fixedRange) { lo = opts.fixedRange[0]; hi = opts.fixedRange[1]; }
+  else { const pad = (hi-lo)*0.08 || 1; lo -= pad; hi += pad; }
+  const n = dates.length;
+  const xScale = (i) => padL + innerW * (i/(n-1));
+  const yScale = (v) => padT + innerH - ((v-lo)/(hi-lo))*innerH;
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}` });
+  const ticks = 4;
+  for (let k = 0; k <= ticks; k++) {
+    const v = lo + (hi-lo)*(k/ticks), y = yScale(v);
+    svg.appendChild(el("line", { class: "gridline", x1: padL, x2: W-padR, y1: y, y2: y }));
+    const t = el("text", { class: "axis-label", x: padL-6, y: y+3, "text-anchor": "end" }); t.textContent = (opts.yfmt||((x)=>x.toFixed(1)))(v);
+    svg.appendChild(t);
+  }
+  if (opts.refLines) opts.refLines.forEach(rl => {
+    const y = yScale(rl.v);
+    svg.appendChild(el("line", { x1: padL, x2: W-padR, y1: y, y2: y, stroke: rl.color, "stroke-width": 1, "stroke-dasharray": "3 3", opacity: 0.7 }));
+  });
+  series.forEach(s => {
+    let d = ""; let started = false;
+    s.values.forEach((v, i) => {
+      if (v == null) { started = false; return; }
+      d += (started ? "L" : "M") + xScale(i) + "," + yScale(v) + " ";
+      started = true;
+    });
+    if (s.fill) {
+      let areaD = ""; started = false; let startI = -1, endI = -1;
+      s.values.forEach((v, i) => {
+        if (v == null) return;
+        if (startI < 0) startI = i; endI = i;
+      });
+      if (startI >= 0) {
+        areaD = `M${xScale(startI)},${yScale(lo)} `;
+        s.values.forEach((v, i) => { if (v != null) areaD += `L${xScale(i)},${yScale(v)} `; });
+        areaD += `L${xScale(endI)},${yScale(lo)} Z`;
+        svg.appendChild(el("path", { d: areaD, fill: s.color, class: "trend-area" }));
+      }
+    }
+    svg.appendChild(el("path", { d, class: "trend-line", stroke: s.color, "stroke-dasharray": s.dashed ? "4 3" : "none" }));
+  });
+  // hover crosshair (series 0 drives)
+  const crosshair = el("line", { class: "crosshair", x1: 0, x2: 0, y1: padT, y2: H-padB });
+  svg.appendChild(crosshair);
+  const dots = series.map(s => { const c = el("circle", { class: "hover-dot", r: 4, fill: s.color, stroke: cssVar("--surface"), "stroke-width": 2 }); svg.appendChild(c); return c; });
+  const hitArea = el("rect", { x: padL, y: padT, width: innerW, height: innerH, fill: "transparent" });
+  hitArea.addEventListener("pointermove", (e) => {
+    const rect = svg.getBoundingClientRect();
+    const px = (e.clientX - rect.left) / rect.width * W;
+    let idx = Math.round(((px - padL) / innerW) * (n-1));
+    idx = Math.max(0, Math.min(n-1, idx));
+    const cx = xScale(idx);
+    crosshair.setAttribute("x1", cx); crosshair.setAttribute("x2", cx); crosshair.setAttribute("opacity", 1);
+    const box = document.createElement("div");
+    box.appendChild(ttHead(opts.dateFmt ? opts.dateFmt(dates[idx]) : fmtDate(dates[idx])));
+    series.forEach((s, si) => {
+      const v = s.values[idx];
+      if (v != null) { dots[si].setAttribute("cx", cx); dots[si].setAttribute("cy", yScale(v)); dots[si].setAttribute("opacity", 1); box.appendChild(ttRow(s.color, s.name, (opts.vfmt||((x)=>x.toFixed(2)))(v))); }
+      else dots[si].setAttribute("opacity", 0);
+    });
+    showTooltip(rect.left + cx/W*rect.width, rect.top + innerH/2, box);
+  });
+  hitArea.addEventListener("pointerleave", () => { crosshair.setAttribute("opacity",0); dots.forEach(d=>d.setAttribute("opacity",0)); hideTooltip(); });
+  svg.appendChild(hitArea);
+  container.appendChild(svg);
+}
+
+/* Squarified treemap */
+function squarify(items, x, y, w, h, out) {
+  if (!items.length) return;
+  if (items.length === 1) { out.push({ item: items[0], x, y, w, h }); return; }
+  const total = items.reduce((a,d)=>a+d.value, 0);
+  const short = Math.min(w, h);
+  let i = 1, bestRatio = Infinity, sum = items[0].value;
+  while (i < items.length) {
+    const newSum = sum + items[i].value;
+    const r1 = worstRatio(items.slice(0, i+1).map(d=>d.value), total, short);
+    if (r1 > bestRatio) break;
+    bestRatio = r1; sum = newSum; i++;
+  }
+  const row = items.slice(0, i), rest = items.slice(i);
+  const rowTotal = row.reduce((a,d)=>a+d.value, 0);
+  const rowSize = total > 0 ? (rowTotal/total) * (w*h) / short : 0;
+  if (w >= h) {
+    let cy = y;
+    row.forEach(d => { const rh = rowTotal>0 ? (d.value/rowTotal)*h : 0; out.push({ item: d, x, y: cy, w: rowSize/h*h, h: rh }); cy += rh; });
+    squarify(rest, x + rowSize/h*h, y, w - rowSize/h*h, h, out);
+  } else {
+    let cx = x;
+    row.forEach(d => { const rw = rowTotal>0 ? (d.value/rowTotal)*w : 0; out.push({ item: d, x: cx, y, w: rw, h: rowSize/w*w }); cx += rw; });
+    squarify(rest, x, y + rowSize/w*w, w, h - rowSize/w*w, out);
+  }
+}
+function worstRatio(vals, total, short) {
+  const sum = vals.reduce((a,b)=>a+b,0);
+  const rowSize = (sum/total) * short * short / short;
+  const maxV = Math.max(...vals), minV = Math.min(...vals);
+  const s2 = (sum/short)**2;
+  return Math.max((s2*maxV)/(sum*sum||1), (sum*sum)/(s2*minV||1));
+}
+
+function renderTreemap(container, items, opts={}) {
+  container.innerHTML = "";
+  const W = opts.w || 900, H = opts.h || 320;
+  const sorted = [...items].sort((a,b) => b.value - a.value);
+  const layout = [];
+  squarify(sorted, 0, 0, W, H, layout);
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}` });
+  layout.forEach(cell => {
+    const g = el("g", { class: "tm-cell" });
+    const rect = el("rect", { x: cell.x, y: cell.y, width: Math.max(0,cell.w), height: Math.max(0,cell.h), fill: cell.item.color, rx: 3 });
+    g.appendChild(rect);
+    if (cell.w > 34 && cell.h > 20) {
+      const textColor = cell.item.textColor || textColorFor(cell.item.color);
+      const lbl = el("text", { x: cell.x+6, y: cell.y+16, fill: textColor }); lbl.textContent = cell.item.label;
+      g.appendChild(lbl);
+      if (cell.item.sub && cell.h > 34) {
+        const sub = el("text", { x: cell.x+6, y: cell.y+28, fill: textColor, class: "tm-sub", opacity: 0.85 }); sub.textContent = cell.item.sub;
+        g.appendChild(sub);
+      }
+    }
+    g.addEventListener("pointerenter", () => {
+      const r = rect.getBoundingClientRect();
+      const box = document.createElement("div");
+      box.appendChild(ttHead(cell.item.label));
+      if (cell.item.tooltip) cell.item.tooltip.forEach(row => box.appendChild(ttRow(row.color, row.name, row.value)));
+      showTooltip(r.left+r.width/2, r.top, box);
+    });
+    g.addEventListener("pointerleave", hideTooltip);
+    if (cell.item.onClick) g.addEventListener("click", cell.item.onClick);
+    svg.appendChild(g);
+  });
+  container.appendChild(svg);
+}
+
+const hex2rgb = (h) => [0,2,4].map(i => parseInt(h.slice(i,i+2),16));
+const mixRgb = (c1, c2, f) => c1.map((v,i) => Math.round(v + (c2[i]-v)*f));
+function surfaceRgb() { return hex2rgb(cssVar("--surface").replace("#","")); }
+function relativeLuminance(rgb) {
+  const lin = rgb.map(v => { const c = v/255; return c <= 0.03928 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4); });
+  return 0.2126*lin[0] + 0.7152*lin[1] + 0.0722*lin[2];
+}
+function textColorFor(rgbCss) {
+  const m = rgbCss.match(/\d+/g).map(Number);
+  return relativeLuminance(m) > 0.45 ? "#0b0b0b" : "#ffffff";
+}
+function returnColor(pct, clamp=3) {
+  const t = Math.max(-1, Math.min(1, pct/clamp));
+  const good = cssVar("--good"), bad = cssVar("--critical");
+  const base = surfaceRgb();
+  if (t >= 0) { const rgb = mixRgb(base, hex2rgb(good.replace("#","")), t); return `rgb(${rgb.join(",")})`; }
+  const rgb = mixRgb(base, hex2rgb(bad.replace("#","")), -t); return `rgb(${rgb.join(",")})`;
+}
+function divergingColor(v, clamp) {
+  const t = Math.max(-1, Math.min(1, v/clamp));
+  const blue = cssVar("--div-blue").replace("#",""), red = cssVar("--div-red").replace("#","");
+  const base = surfaceRgb();
+  if (t >= 0) { const rgb = mixRgb(base, hex2rgb(red), t); return `rgb(${rgb.join(",")})`; }
+  const rgb = mixRgb(base, hex2rgb(blue), -t); return `rgb(${rgb.join(",")})`;
+}
+function scatterChart(container, points, opts) {
+  container.innerHTML = "";
+  const W = opts.w || 900, H = opts.h || 380, padL = 56, padR = 20, padT = 16, padB = 34;
+  const innerW = W-padL-padR, innerH = H-padT-padB;
+  const xs = points.map(p=>p.x), ys = points.map(p=>p.y);
+  const xLog = opts.xLog;
+  const xVal = (x) => xLog ? Math.log10(x) : x;
+  const xlo = Math.min(...xs.map(xVal)), xhi = Math.max(...xs.map(xVal));
+  let ylo = Math.min(...ys), yhi = Math.max(...ys);
+  const ypad = (yhi-ylo)*0.1 || 1; ylo -= ypad; yhi += ypad;
+  const xScale = (x) => padL + ((xVal(x)-xlo)/(xhi-xlo || 1))*innerW;
+  const yScale = (y) => padT + innerH - ((y-ylo)/(yhi-ylo || 1))*innerH;
+  const maxR = Math.max(...points.map(p=>p.size));
+  const rScale = (s) => 4 + Math.sqrt(s/maxR)*18;
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}` });
+  for (let k=0;k<=4;k++) {
+    const y = padT + innerH*(k/4);
+    svg.appendChild(el("line", { class: "gridline", x1: padL, x2: W-padR, y1: y, y2: y }));
+    const v = yhi - (yhi-ylo)*(k/4);
+    const t = el("text", { class: "axis-label", x: padL-6, y: y+3, "text-anchor": "end" }); t.textContent = (opts.yfmt||((x)=>x.toFixed(0)))(v);
+    svg.appendChild(t);
+  }
+  if (opts.yZeroLine) { const y0 = yScale(0); svg.appendChild(el("line", { class:"baseline-line", x1:padL, x2:W-padR, y1:y0, y2:y0 })); }
+  const xticks = opts.xTicks || [xlo, (xlo+xhi)/2, xhi];
+  xticks.forEach(xv => {
+    const realX = xLog ? Math.pow(10,xv) : xv;
+    const x = xScale(realX);
+    const t = el("text", { class: "axis-label", x, y: H-padB+14, "text-anchor": "middle" }); t.textContent = (opts.xfmt||((v)=>v.toFixed(0)))(realX);
+    svg.appendChild(t);
+  });
+  points.forEach(p => {
+    const cx = xScale(p.x), cy = yScale(p.y), r = rScale(p.size);
+    const c = el("circle", { cx, cy, r, fill: p.color, opacity: 0.82, stroke: cssVar("--surface"), "stroke-width": 1.5 });
+    c.addEventListener("pointerenter", () => {
+      const rect = c.getBoundingClientRect();
+      const box = document.createElement("div");
+      box.appendChild(ttHead(p.label));
+      (p.tooltip||[]).forEach(row => box.appendChild(ttRow(row.color, row.name, row.value)));
+      showTooltip(rect.left+rect.width/2, rect.top, box);
+    });
+    c.addEventListener("pointerleave", hideTooltip);
+    if (p.onClick) c.addEventListener("click", p.onClick);
+    svg.appendChild(c);
+  });
+  container.appendChild(svg);
+}
+
+/* ---------------- selection ---------------- */
+function selectTicker(t) {
+  state.selectedTicker = t;
+  document.getElementById("d-ticker").value = t;
+  renderDetail();
+  document.getElementById("detail-section").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+</script>
+<script>
+__PART2__
+</script>
+</body>
+</html>
