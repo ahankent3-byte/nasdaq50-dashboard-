@@ -33,13 +33,15 @@ function getPeriodIndices() {
   return { startIdx: Math.max(0, N-2), endIdx: N-1 }; // "1D"
 }
 function periodLabel(startIdx, endIdx) {
+  if (state.replayEnd != null) return `▶ Replaying · ${fmtDate(DATA.dates[endIdx])}`;
   const sessions = endIdx - startIdx + 1;
   if (state.period === "1D") return `Latest session · ${fmtDate(DATA.dates[endIdx])}`;
   return `${fmtDate(DATA.dates[startIdx])} → ${fmtDate(DATA.dates[endIdx])} · ${sessions} trading sessions`;
 }
 let PERIOD = null;
 function computePeriod() {
-  const { startIdx, endIdx } = getPeriodIndices();
+  let { startIdx, endIdx } = getPeriodIndices();
+  if (state.replayEnd != null) endIdx = Math.max(startIdx + 1, Math.min(state.replayEnd, endIdx));
   const metrics = {};
   TICKERS.forEach(t => {
     const s = DATA.stocks[t];
@@ -490,9 +492,46 @@ function renderDetail() {
   renderMacdChart(document.getElementById("d-macd"), dSlice, sliceArr(cache.macd.macd), sliceArr(cache.macd.signal), sliceArr(cache.macd.hist));
 }
 
+/* ---------------- ticker tape ---------------- */
+let tapeKey = "";
+function buildTape() {
+  const tape = document.getElementById("tape");
+  const root = document.documentElement;
+  const key = [PERIOD.startIdx, PERIOD.endIdx, root.dataset.theme || "", root.dataset.accent || ""].join(":");
+  if (key === tapeKey) return;   // avoid restarting the marquee on unrelated re-renders
+  tapeKey = key;
+  tape.innerHTML = "";
+  const track = document.createElement("div");
+  track.className = "tape-track";
+  track.style.animationDuration = (TICKERS.length * 3) + "s";
+  for (let rep = 0; rep < 2; rep++) {
+    TICKERS.forEach(t => {
+      const p = PERIOD.metrics[t];
+      const item = document.createElement("span");
+      item.className = "tape-item";
+      if (rep === 1) item.setAttribute("aria-hidden", "true");
+      const sym = document.createElement("span");
+      sym.className = "sym";
+      sym.style.color = sectorColor(DATA.stocks[t].sector);
+      sym.textContent = t;
+      const px = document.createElement("span");
+      px.className = "px";
+      px.textContent = fmtUsd(p.close);
+      const chg = document.createElement("span");
+      chg.className = "chg " + (p.periodReturn >= 0 ? "pos" : "neg");
+      chg.textContent = (p.periodReturn >= 0 ? "▲ " : "▼ ") + fmtPct(p.periodReturn);
+      item.append(sym, px, chg);
+      item.addEventListener("click", () => selectTicker(t));
+      track.appendChild(item);
+    });
+  }
+  tape.appendChild(track);
+}
+
 /* ---------------- filters + init ---------------- */
 function renderAll() {
   computePeriod();
+  buildTape();
   const filtered = getFiltered();
   document.getElementById("filter-count").textContent = `${filtered.length} of ${TICKERS.length} companies`;
   renderKPIs(filtered);
@@ -558,8 +597,97 @@ function wireEvents() {
   });
 }
 
+/* ---------------- theme & palette ---------------- */
+const themeSeg = document.getElementById("themeSeg");
+const accentSel = document.getElementById("accentSel");
+function rerenderForTheme() {
+  tapeKey = "";
+  renderAll();
+  renderRollingVol();
+  renderDetail();
+}
+function applyTheme(mode) {
+  if (mode === "system") delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = mode;
+  themeSeg.querySelectorAll("button").forEach(b =>
+    b.setAttribute("aria-pressed", String(b.dataset.themeOpt === mode)));
+  try { localStorage.setItem("nd50-theme", mode); } catch {}
+}
+function applyAccent(accent) {
+  if (accent === "classic") delete document.documentElement.dataset.accent;
+  else document.documentElement.dataset.accent = accent;
+  accentSel.value = accent;
+  try { localStorage.setItem("nd50-accent", accent); } catch {}
+}
+themeSeg.addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-theme-opt]");
+  if (!btn) return;
+  applyTheme(btn.dataset.themeOpt);
+  rerenderForTheme();
+});
+accentSel.addEventListener("change", () => { applyAccent(accentSel.value); rerenderForTheme(); });
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", rerenderForTheme);
+
+/* ---------------- period replay ---------------- */
+const replayBtn = document.getElementById("replayBtn");
+const replayDot = document.getElementById("replayDot");
+let replayTimer = null;
+state.replayEnd = null;
+function renderReplayFrame() {
+  computePeriod();
+  const filtered = getFiltered();
+  renderKPIs(filtered);
+  renderGainersLosers(filtered);
+  renderHeatmapSection(filtered);
+  renderReturnsHist(filtered);
+}
+function stopReplay() {
+  if (replayTimer) { clearInterval(replayTimer); replayTimer = null; }
+  state.replayEnd = null;
+  replayBtn.textContent = "▶";
+  replayBtn.setAttribute("aria-label", "Replay the selected period");
+  replayDot.classList.remove("on");
+  renderAll();
+}
+replayBtn.addEventListener("click", () => {
+  if (replayTimer) { stopReplay(); return; }
+  const { startIdx, endIdx } = getPeriodIndices();
+  const span = endIdx - startIdx;
+  if (span < 2) {
+    document.getElementById("period-summary").textContent = "Pick a multi-day period to replay";
+    setTimeout(() => { if (!replayTimer) computePeriod(); }, 1800);
+    return;
+  }
+  const stride = Math.max(1, Math.ceil(span / 60));
+  let cur = startIdx + stride;
+  window.ANIMATE_LINES = false;
+  replayBtn.textContent = "❚❚";
+  replayBtn.setAttribute("aria-label", "Stop replay");
+  replayDot.classList.add("on");
+  const tick = () => {
+    state.replayEnd = Math.min(cur, endIdx);
+    renderReplayFrame();
+    if (cur >= endIdx) { stopReplay(); return; }
+    cur += stride;
+  };
+  tick();
+  replayTimer = setInterval(tick, 300);
+});
+
 state.range = "1Y";
 state.period = "1D";
+let savedTheme = "system", savedAccent = "classic";
+try {
+  savedTheme = localStorage.getItem("nd50-theme") || "system";
+  savedAccent = localStorage.getItem("nd50-accent") || "classic";
+} catch {}
+applyTheme(savedTheme);
+applyAccent(savedAccent);
+document.body.classList.add("entrance");
+setTimeout(() => {
+  document.body.classList.remove("entrance");
+  window.ANIMATE_LINES = false;
+}, 1600);
 document.getElementById("asof-date").textContent = fmtDate(DATA.asOf);
 document.getElementById("period-from").min = DATA.dates[0];
 document.getElementById("period-from").max = DATA.dates[DATA.dates.length-1];
