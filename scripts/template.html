@@ -253,6 +253,8 @@
   .kpi .value.good { color: var(--good); }
   .kpi .value.bad { color: var(--critical); }
   .kpi .sub2 { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .kpi-clickable { cursor: pointer; transition: border-color 0.12s ease, transform 0.12s ease; }
+  .kpi-clickable:hover { border-color: var(--accent); transform: translateY(-1px); }
 
   .bar-up { fill: var(--good); }
   .bar-down { fill: var(--critical); }
@@ -340,6 +342,23 @@
   .detail-charts { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; }
   .detail-sub-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
 
+  /* Company page (full takeover view) */
+  .cv-topbar { margin-bottom: 16px; }
+  .cv-back-btn {
+    background: var(--surface); border: 1px solid var(--border); color: var(--ink-2);
+    border-radius: 8px; padding: 8px 14px; font-size: 13px; cursor: pointer; font-family: inherit;
+  }
+  .cv-back-btn:hover { background: var(--surface-2); color: var(--ink); }
+  .cv-header { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
+  .cv-header h1 { margin: 4px 0 2px; font-size: 26px; font-weight: 700; letter-spacing: -0.01em; }
+  .cv-header p { margin: 0; color: var(--ink-2); font-size: 13.5px; }
+  .cv-price-block { text-align: right; }
+  .cv-price { font-size: 32px; font-weight: 700; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+  .cv-change { font-size: 15px; font-weight: 600; margin-top: 2px; }
+  .cv-change.pos { color: var(--good); }
+  .cv-change.neg { color: var(--critical); }
+  .chart-type-toggle button { min-width: 40px; }
+
   footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
 
   @media (max-width: 1080px) {
@@ -354,6 +373,7 @@
 </head>
 <body>
 <div class="wrap">
+<div id="dashboard-view">
 
   <div class="masthead">
     <div>
@@ -429,8 +449,14 @@
 
   <!-- 1. KPI ROW -->
   <div class="section">
-    <div class="section-title"><h2>Market Snapshot</h2><span class="q">How is the market performing over the selected period?</span></div>
+    <div class="section-title"><h2>Market Snapshot</h2><span class="q" id="snapshot-scope">How is the market performing over the selected period?</span></div>
     <div class="grid-8" id="kpi-row"></div>
+    <div class="panel" id="sector-company-list" style="display:none; margin-top:12px;">
+      <h3 id="sector-company-list-title">Companies in this sector</h3>
+      <div class="table-wrap"><table class="dtable" id="sector-company-table"><thead><tr>
+        <th>Ticker</th><th>Company</th><th>Price</th><th>Return</th><th>Market Cap</th>
+      </tr></thead><tbody id="sector-company-tbody"></tbody></table></div>
+    </div>
   </div>
 
   <!-- 2. PERFORMANCE -->
@@ -460,7 +486,7 @@
   <div class="section">
     <div class="section-title"><h2>Risk Analysis</h2><span class="q">Where is risk concentrated?</span></div>
     <div class="grid-2">
-      <div class="panel"><h3>Highest volatility names</h3><p class="sub">Annualized, trailing 1-year daily returns</p><div id="risk-table"></div></div>
+      <div class="panel"><h3>Highest volatility names</h3><p class="sub" id="risk-window-label">Annualized, trailing 1-year daily returns</p><div id="risk-table"></div></div>
       <div class="panel"><h3>Nasdaq Composite — 30-day rolling volatility</h3><p class="sub">Annualized, trailing 30 sessions</p><div id="rolling-vol"></div></div>
     </div>
   </div>
@@ -489,7 +515,7 @@
   <div class="section">
     <div class="section-title"><h2>Correlation Matrix</h2><span class="q">Where are the diversification opportunities?</span></div>
     <div class="panel">
-      <h3>Pairwise return correlation</h3><p class="sub">Trailing 1-year daily returns</p>
+      <h3>Pairwise return correlation</h3><p class="sub" id="corr-window-label">Trailing 1-year daily returns</p>
       <div class="legend" id="corr-legend"></div>
       <div class="table-wrap" id="corr-matrix"></div>
     </div>
@@ -500,46 +526,11 @@
     <div class="section-title"><h2>Returns &amp; Risk-Adjusted Performance</h2><span class="q">How wide is today's dispersion — and who compounds best per unit of risk?</span></div>
     <div class="grid-2">
       <div class="panel"><h3>Returns distribution</h3><p class="sub" id="hist-sub">Period return, all constituents</p><div id="returns-hist"></div></div>
-      <div class="panel"><h3>CAGR vs. volatility</h3><p class="sub">5-year CAGR · bubble size = market cap · color = sector</p><div class="legend" id="cagr-legend"></div><div id="cagr-scatter"></div></div>
+      <div class="panel"><h3>Return vs. volatility</h3><p class="sub" id="retvol-sub">Period return vs. volatility · bubble size = market cap · color = sector</p><div class="legend" id="cagr-legend"></div><div id="cagr-scatter"></div></div>
     </div>
   </div>
 
-  <!-- 9. COMPANY DETAIL / DRILL-THROUGH -->
-  <div class="section" id="detail-section">
-    <div class="section-title"><h2>Company Detail</h2><span class="q">Select a company, or click any ticker above, to drill in</span></div>
-    <div class="panel">
-      <div class="detail-head">
-        <div class="detail-select">
-          <select id="d-ticker"></select>
-        </div>
-        <div class="range-toggle" id="d-range">
-          <button data-range="1M">1M</button>
-          <button data-range="3M">3M</button>
-          <button data-range="YTD">YTD</button>
-          <button data-range="1Y" class="active">1Y</button>
-          <button data-range="5Y">5Y</button>
-        </div>
-        <div class="ma-toggle">
-          <label><input type="checkbox" class="d-ma" value="20" checked /> SMA 20</label>
-          <label><input type="checkbox" class="d-ma" value="50" checked /> SMA 50</label>
-          <label><input type="checkbox" class="d-ma" value="200" /> SMA 200</label>
-          <label><input type="checkbox" id="d-bb" /> Bollinger</label>
-        </div>
-        <div class="detail-name"><div class="tk" id="d-tk"></div><div class="nm" id="d-nm"></div></div>
-      </div>
-      <div class="ratio-grid" id="d-ratios"></div>
-      <div class="detail-charts">
-        <div><h3 style="font-size:13px;margin:0 0 8px;">Price &amp; moving averages</h3><div id="d-price"></div></div>
-        <div><h3 style="font-size:13px;margin:0 0 8px;">Volume</h3><div id="d-volume"></div></div>
-      </div>
-      <div class="detail-sub-charts">
-        <div class="panel"><h3>RSI (14)</h3><p class="sub">&lt;30 oversold · &gt;70 overbought</p><div id="d-rsi"></div></div>
-        <div class="panel"><h3>MACD (12, 26, 9)</h3><p class="sub">Trend &amp; momentum crossover</p><div id="d-macd"></div></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 10. COMPANY TABLE -->
+  <!-- 9. COMPANY TABLE -->
   <div class="section">
     <div class="section-title"><h2>Company Detail Table</h2><span class="q">Which companies deserve deeper investigation?</span></div>
     <div class="panel">
@@ -561,6 +552,64 @@
     <span>Source: Yahoo Finance daily OHLCV &amp; fundamentals (via yfinance)</span>
     <span>Risk-free rate assumption for Sharpe: 4.0% · Daily return = close-over-close</span>
   </footer>
+
+</div><!-- /dashboard-view -->
+
+<div id="company-view" style="display:none;">
+  <div class="cv-topbar"><button class="cv-back-btn" id="cv-back">← Back to dashboard</button></div>
+  <div class="cv-header">
+    <div>
+      <span class="eyebrow" id="cv-scope"></span>
+      <h1 id="cv-name"></h1>
+      <p id="cv-industry"></p>
+    </div>
+    <div class="cv-price-block">
+      <div class="cv-price" id="cv-price"></div>
+      <div class="cv-change" id="cv-change"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="detail-head">
+      <div class="detail-select"><select id="cv-ticker"></select></div>
+      <div class="range-toggle" id="cv-range">
+        <button data-range="1M">1M</button>
+        <button data-range="3M">3M</button>
+        <button data-range="YTD">YTD</button>
+        <button data-range="1Y" class="active">1Y</button>
+        <button data-range="5Y">5Y</button>
+      </div>
+      <div class="range-toggle chart-type-toggle" id="cv-chart-type">
+        <button data-charttype="line" class="active">Line</button>
+        <button data-charttype="candle">Candle</button>
+      </div>
+      <div class="ma-toggle">
+        <label><input type="checkbox" class="cv-ma" value="20" checked /> SMA 20</label>
+        <label><input type="checkbox" class="cv-ma" value="50" checked /> SMA 50</label>
+        <label><input type="checkbox" class="cv-ma" value="200" /> SMA 200</label>
+        <label><input type="checkbox" id="cv-bb" /> Bollinger</label>
+      </div>
+    </div>
+    <div class="detail-charts">
+      <div><h3 style="font-size:13px;margin:0 0 8px;">Price</h3><div id="cv-price-chart"></div></div>
+      <div><h3 style="font-size:13px;margin:0 0 8px;">Volume</h3><div id="cv-volume"></div></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title"><h2>Technical Analysis</h2><span class="q">Price momentum and trend signals</span></div>
+    <div class="detail-sub-charts">
+      <div class="panel"><h3>RSI (14)</h3><p class="sub">&lt;30 oversold · &gt;70 overbought</p><div id="cv-rsi"></div></div>
+      <div class="panel"><h3>MACD (12, 26, 9)</h3><p class="sub">Trend &amp; momentum crossover</p><div id="cv-macd"></div></div>
+    </div>
+    <div class="ratio-grid" id="cv-technical-ratios" style="margin-top:12px;"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title"><h2>Fundamental Analysis</h2><span class="q">Valuation, profitability, and analyst view</span></div>
+    <div class="ratio-grid" id="cv-fundamental-ratios"></div>
+  </div>
+</div><!-- /company-view -->
 
 </div>
 <div class="tooltip" id="tooltip"></div>
@@ -629,6 +678,11 @@ function dailyReturns(close) {
   return r;
 }
 function mean(arr) { return arr.reduce((a,b) => a+b, 0) / arr.length; }
+function median(arr) {
+  const s = [...arr].sort((a,b) => a-b);
+  const mid = Math.floor(s.length/2);
+  return s.length % 2 ? s[mid] : (s[mid-1]+s[mid])/2;
+}
 function stdev(arr) {
   const m = mean(arr);
   return Math.sqrt(arr.reduce((a,b) => a + (b-m)*(b-m), 0) / (arr.length - 1));
@@ -785,9 +839,13 @@ function getFiltered() {
 }
 
 /* ---------------- chart primitives ---------------- */
+function truncateName(name, max=16) {
+  if (!name) return "";
+  return name.length > max ? name.slice(0, max-1) + "…" : name;
+}
 function hBarChart(container, items, opts) {
   container.innerHTML = "";
-  const W = 460, rowH = 26, padL = 8, padR = 56, labelW = 96;
+  const W = 520, rowH = 26, padL = 8, padR = 56, labelW = 150;
   const H = items.length * rowH + 10;
   const innerW = W - padL - padR - labelW;
   const maxAbs = Math.max(0.001, ...items.map(d => Math.abs(d.value)));
@@ -807,8 +865,14 @@ function hBarChart(container, items, opts) {
     if (neutral) { rectAttrs.class = "bar-visual"; rectAttrs.fill = opts.barColor; }
     else rectAttrs.class = isPos ? "bar-visual bar-up" : "bar-visual bar-down";
     const rect = el("rect", rectAttrs);
-    const label = el("text", { x: padL, y: y+4, class: "axis-label", style: "font-size:10.5px;font-weight:600;fill:var(--ink)" });
+    const label = el("text", { x: padL, y: y+4, class: "axis-label", style: "font-size:10.5px;font-weight:700;fill:var(--ink)" });
     label.textContent = d.label;
+    if (d.sub) {
+      const tickerWidth = d.label.length * 6.3 + 6;
+      const nameEl = el("text", { x: padL + tickerWidth, y: y+4, class: "axis-label", style: "font-size:9.5px;fill:var(--muted)" });
+      nameEl.textContent = truncateName(d.sub, 15);
+      svg.appendChild(nameEl);
+    }
     const valText = el("text", { x: barX + w + 6, y: y+4, class: "axis-label",
       "text-anchor": "start", style: `font-weight:700;fill:${valueColor}` });
     valText.textContent = (opts.fmt || fmtPct)(d.value);
@@ -940,6 +1004,67 @@ function renderLineChart(container, dates, series, opts={}) {
   container.appendChild(svg);
 }
 
+function renderCandlestick(container, dates, ohlc, overlays, opts={}) {
+  container.innerHTML = "";
+  const W = opts.w || 700, H = opts.h || 260, padL = 46, padR = 14, padT = 14, padB = 20;
+  const innerW = W - padL - padR, innerH = H - padT - padB;
+  const n = dates.length;
+  const allVals = ohlc.low.concat(ohlc.high, ...(overlays||[]).map(o => o.values.filter(v=>v!=null)));
+  let lo = Math.min(...allVals), hi = Math.max(...allVals);
+  const pad = (hi-lo)*0.06 || 1; lo -= pad; hi += pad;
+  const xScale = (i) => padL + innerW * ((i+0.5)/n);
+  const yScale = (v) => padT + innerH - ((v-lo)/(hi-lo))*innerH;
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}` });
+  const ticks = 4;
+  for (let k = 0; k <= ticks; k++) {
+    const v = lo + (hi-lo)*(k/ticks), y = yScale(v);
+    svg.appendChild(el("line", { class: "gridline", x1: padL, x2: W-padR, y1: y, y2: y }));
+    const t = el("text", { class: "axis-label", x: padL-6, y: y+3, "text-anchor": "end" }); t.textContent = (opts.yfmt||((x)=>x.toFixed(1)))(v);
+    svg.appendChild(t);
+  }
+  (overlays||[]).forEach(o => {
+    let d = ""; let started = false;
+    o.values.forEach((v, i) => { if (v == null) { started = false; return; } d += (started?"L":"M")+xScale(i)+","+yScale(v)+" "; started = true; });
+    svg.appendChild(el("path", { d, class: "trend-line", stroke: o.color, "stroke-dasharray": o.dashed ? "4 3" : "none" }));
+  });
+  const candleW = Math.max(1.5, Math.min(10, innerW/n * 0.62));
+  const crosshair = el("line", { class: "crosshair", x1: 0, x2: 0, y1: padT, y2: H-padB });
+  for (let i = 0; i < n; i++) {
+    const o = ohlc.open[i], h = ohlc.high[i], l = ohlc.low[i], c = ohlc.close[i];
+    const isUp = c >= o;
+    const color = isUp ? cssVar("--good") : cssVar("--critical");
+    const cx = xScale(i);
+    svg.appendChild(el("line", { x1: cx, x2: cx, y1: yScale(h), y2: yScale(l), stroke: color, "stroke-width": 1 }));
+    const bodyTop = yScale(Math.max(o,c)), bodyBot = yScale(Math.min(o,c));
+    svg.appendChild(el("rect", { x: cx-candleW/2, y: bodyTop, width: candleW, height: Math.max(1, bodyBot-bodyTop), fill: color }));
+  }
+  svg.appendChild(crosshair);
+  const hoverDot = el("circle", { class: "hover-dot", r: 4, fill: cssVar("--ink"), stroke: cssVar("--surface"), "stroke-width": 2 });
+  svg.appendChild(hoverDot);
+  const hitArea = el("rect", { x: padL, y: padT, width: innerW, height: innerH, fill: "transparent" });
+  hitArea.addEventListener("pointermove", (e) => {
+    const rect = svg.getBoundingClientRect();
+    const px = (e.clientX - rect.left) / rect.width * W;
+    let idx = Math.round(((px - padL) / innerW) * n - 0.5);
+    idx = Math.max(0, Math.min(n-1, idx));
+    const cx = xScale(idx);
+    crosshair.setAttribute("x1", cx); crosshair.setAttribute("x2", cx); crosshair.setAttribute("opacity", 1);
+    hoverDot.setAttribute("opacity", 0);
+    const box = document.createElement("div");
+    box.appendChild(ttHead(fmtDate(dates[idx])));
+    const isUp = ohlc.close[idx] >= ohlc.open[idx];
+    const color = isUp ? cssVar("--good") : cssVar("--critical");
+    box.appendChild(ttRow(color, "Open", fmtUsd(ohlc.open[idx])));
+    box.appendChild(ttRow(color, "High", fmtUsd(ohlc.high[idx])));
+    box.appendChild(ttRow(color, "Low", fmtUsd(ohlc.low[idx])));
+    box.appendChild(ttRow(color, "Close", fmtUsd(ohlc.close[idx])));
+    showTooltip(rect.left + cx/W*rect.width, rect.top + innerH/2, box);
+  });
+  hitArea.addEventListener("pointerleave", () => { crosshair.setAttribute("opacity",0); hideTooltip(); });
+  svg.appendChild(hitArea);
+  container.appendChild(svg);
+}
+
 /* Squarified treemap */
 function squarify(items, x, y, w, h, out) {
   if (!items.length) return;
@@ -1046,7 +1171,7 @@ function scatterChart(container, points, opts) {
   const xScale = (x) => padL + ((xVal(x)-xlo)/(xhi-xlo || 1))*innerW;
   const yScale = (y) => padT + innerH - ((y-ylo)/(yhi-ylo || 1))*innerH;
   const maxR = Math.max(...points.map(p=>p.size));
-  const rScale = (s) => 4 + Math.sqrt(s/maxR)*18;
+  const rScale = (s) => 3.5 + Math.sqrt(s/maxR)*(opts.maxRadius || 18);
   const svg = el("svg", { viewBox: `0 0 ${W} ${H}` });
   for (let k=0;k<=4;k++) {
     const y = padT + innerH*(k/4);
@@ -1056,6 +1181,13 @@ function scatterChart(container, points, opts) {
     svg.appendChild(t);
   }
   if (opts.yZeroLine) { const y0 = yScale(0); svg.appendChild(el("line", { class:"baseline-line", x1:padL, x2:W-padR, y1:y0, y2:y0 })); }
+  if (opts.xMedianLine) {
+    const medX = median(xs);
+    const mx = xScale(medX);
+    svg.appendChild(el("line", { x1: mx, x2: mx, y1: padT, y2: H-padB, stroke: cssVar("--muted"), "stroke-width": 1, "stroke-dasharray": "3 3", opacity: 0.6 }));
+    const lbl = el("text", { class: "axis-label", x: mx, y: padT-4, "text-anchor": "middle" }); lbl.textContent = "median";
+    svg.appendChild(lbl);
+  }
   const xticks = opts.xTicks || [xlo, (xlo+xhi)/2, xhi];
   xticks.forEach(xv => {
     const realX = xLog ? Math.pow(10,xv) : xv;
@@ -1077,15 +1209,20 @@ function scatterChart(container, points, opts) {
     if (p.onClick) c.addEventListener("click", p.onClick);
     svg.appendChild(c);
   });
+  if (opts.directLabelTickers) {
+    points.filter(p => opts.directLabelTickers.has(p.ticker)).forEach(p => {
+      const cx = xScale(p.x), cy = yScale(p.y), r = rScale(p.size);
+      const t = el("text", { x: cx, y: cy - r - 4, "text-anchor": "middle", class: "axis-label", style: "font-weight:700;fill:var(--ink)" });
+      t.textContent = p.ticker;
+      svg.appendChild(t);
+    });
+  }
   container.appendChild(svg);
 }
 
 /* ---------------- selection ---------------- */
 function selectTicker(t) {
-  state.selectedTicker = t;
-  document.getElementById("d-ticker").value = t;
-  renderDetail();
-  document.getElementById("detail-section").scrollIntoView({ behavior: "smooth", block: "start" });
+  openCompanyPage(t);
 }
 </script>
 <script>

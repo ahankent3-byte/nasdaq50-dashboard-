@@ -38,10 +38,17 @@ function periodLabel(startIdx, endIdx) {
   if (state.period === "1D") return `Latest session · ${fmtDate(DATA.dates[endIdx])}`;
   return `${fmtDate(DATA.dates[startIdx])} → ${fmtDate(DATA.dates[endIdx])} · ${sessions} trading sessions`;
 }
+const RISK_MIN_SESSIONS = 20;
+function riskWindow(startIdx, endIdx) {
+  if (endIdx - startIdx >= RISK_MIN_SESSIONS) return { rStart: startIdx, rEnd: endIdx };
+  return { rStart: Math.max(0, endIdx - RISK_MIN_SESSIONS), rEnd: endIdx };
+}
 let PERIOD = null;
 function computePeriod() {
   let { startIdx, endIdx } = getPeriodIndices();
   if (state.replayEnd != null) endIdx = Math.max(startIdx + 1, Math.min(state.replayEnd, endIdx));
+  const { rStart, rEnd } = riskWindow(startIdx, endIdx);
+  const benchRetSlice = benchRet.slice(rStart, rEnd);
   const metrics = {};
   TICKERS.forEach(t => {
     const s = DATA.stocks[t];
@@ -50,9 +57,14 @@ function computePeriod() {
     let volSum = 0, dollarSum = 0;
     for (let i = startIdx+1; i <= endIdx; i++) { volSum += s.volume[i]; dollarSum += s.volume[i]*s.close[i]; }
     const days = Math.max(1, endIdx - startIdx);
-    metrics[t] = { periodReturn, periodVolume: volSum, periodDollarVolume: dollarSum, avgDailyVolume: volSum/days, close: endClose };
+    const retSlice = M[t].ret.slice(rStart, rEnd);
+    const vol = stdev(retSlice) * Math.sqrt(TDAYS) * 100;
+    const beta = betaCalc(retSlice, benchRetSlice);
+    const sharpe = sharpeCalc(retSlice);
+    metrics[t] = { periodReturn, periodVolume: volSum, periodDollarVolume: dollarSum, avgDailyVolume: volSum/days,
+                   close: endClose, vol, beta, sharpe, retSlice };
   });
-  PERIOD = { startIdx, endIdx, metrics };
+  PERIOD = { startIdx, endIdx, rStart, rEnd, metrics };
   document.getElementById("period-summary").textContent = periodLabel(startIdx, endIdx);
   const isSingleDay = state.period === "1D";
   document.getElementById("gainers-sub").textContent = isSingleDay ? "Daily return, close-over-close" : "Period return, start-to-end close";
@@ -60,6 +72,13 @@ function computePeriod() {
   document.getElementById("heatmap-sub").textContent = `Tile size = market cap · color = ${isSingleDay ? "today's" : "period"} return`;
   document.getElementById("hist-sub").textContent = isSingleDay ? "Today's daily return, all constituents" : "Period return, all constituents";
   document.getElementById("top-volume-sub").textContent = isSingleDay ? "Today's session" : "Total shares traded over selected period";
+  const riskSessions = rEnd - rStart;
+  const riskWindowText = `Annualized, ${riskSessions} sessions ending ${fmtDate(DATA.dates[rEnd])}` +
+    (riskSessions !== (endIdx-startIdx) ? ` (period extended to ${RISK_MIN_SESSIONS}-session minimum)` : "");
+  const riskLabelEl = document.getElementById("risk-window-label");
+  if (riskLabelEl) riskLabelEl.textContent = riskWindowText;
+  const corrLabelEl = document.getElementById("corr-window-label");
+  if (corrLabelEl) corrLabelEl.textContent = riskSessions + " daily returns ending " + fmtDate(DATA.dates[rEnd]);
 }
 
 /* ---------------- legends ---------------- */
@@ -88,18 +107,44 @@ function buildCorrLegend(container) {
   });
 }
 
+/* ---------------- sector scope ---------------- */
+function updateSnapshotScope(filtered) {
+  const scopeEl = document.getElementById("snapshot-scope");
+  const listWrap = document.getElementById("sector-company-list");
+  if (state.sector !== "All") {
+    scopeEl.textContent = `Showing the ${state.sector} sector — ${filtered.length} of ${TICKERS.length} companies`;
+    document.getElementById("sector-company-list-title").textContent = `Companies in ${state.sector}`;
+    const tbody = document.getElementById("sector-company-tbody");
+    tbody.innerHTML = "";
+    [...filtered].sort((a,b) => DATA.stocks[b].marketCap - DATA.stocks[a].marketCap).forEach(t => {
+      const s = DATA.stocks[t], p = PERIOD.metrics[t];
+      const tr = document.createElement("tr");
+      tr.style.cursor = "pointer";
+      tr.innerHTML = `<td style="font-weight:700">${t}</td><td>${s.name}</td><td>${fmtUsd(p.close)}</td>
+        <td class="${p.periodReturn>=0?'pos':'neg'}">${fmtPct(p.periodReturn)}</td><td>${fmtCompact(s.marketCap)}</td>`;
+      tr.addEventListener("click", () => openCompanyPage(t));
+      tbody.appendChild(tr);
+    });
+    listWrap.style.display = "block";
+  } else {
+    scopeEl.textContent = "How is the market performing over the selected period?";
+    listWrap.style.display = "none";
+  }
+}
+
 /* ---------------- KPI row ---------------- */
 function renderKPIs(filtered) {
   const container = document.getElementById("kpi-row"); container.innerHTML = "";
+  updateSnapshotScope(filtered);
   if (!filtered.length) { container.innerHTML = '<p style="color:var(--muted);grid-column:1/-1;">No companies match the current filters.</p>'; return; }
   const totalCap = filtered.reduce((a,t) => a + DATA.stocks[t].marketCap, 0);
   const avgRet = mean(filtered.map(t => PERIOD.metrics[t].periodReturn));
   const best = filtered.reduce((a,b) => PERIOD.metrics[a].periodReturn > PERIOD.metrics[b].periodReturn ? a : b);
   const worst = filtered.reduce((a,b) => PERIOD.metrics[a].periodReturn < PERIOD.metrics[b].periodReturn ? a : b);
   const pes = filtered.map(t => DATA.stocks[t].trailingPE).filter(v => v != null);
-  const avgPE = pes.length ? mean(pes) : null;
+  const medPE = pes.length ? median(pes) : null;
   const totalDollarVol = filtered.reduce((a,t) => a + PERIOD.metrics[t].periodDollarVolume, 0);
-  const avgVol = mean(filtered.map(t => M[t].vol1y));
+  const avgVol = mean(filtered.map(t => PERIOD.metrics[t].vol));
   const up = filtered.filter(t => PERIOD.metrics[t].periodReturn > 0).length;
   const down = filtered.filter(t => PERIOD.metrics[t].periodReturn < 0).length;
   const isSingleDay = state.period === "1D";
@@ -107,16 +152,17 @@ function renderKPIs(filtered) {
   const tiles = [
     { label: "Total market cap", value: fmtCompact(totalCap) },
     { label: isSingleDay ? "Average daily return" : "Average period return", value: fmtPct(avgRet), cls: avgRet >= 0 ? "good" : "bad" },
-    { label: "Best performer", value: best, sub2: fmtPct(PERIOD.metrics[best].periodReturn), cls: "good" },
-    { label: "Worst performer", value: worst, sub2: fmtPct(PERIOD.metrics[worst].periodReturn), cls: "bad" },
-    { label: "Average P/E ratio", value: avgPE != null ? avgPE.toFixed(1) : "—" },
+    { label: "Best performer", value: `${best} · ${DATA.stocks[best].name}`, sub2: fmtPct(PERIOD.metrics[best].periodReturn), cls: "good", onClick: () => openCompanyPage(best) },
+    { label: "Worst performer", value: `${worst} · ${DATA.stocks[worst].name}`, sub2: fmtPct(PERIOD.metrics[worst].periodReturn), cls: "bad", onClick: () => openCompanyPage(worst) },
+    { label: "Median P/E ratio", value: medPE != null ? medPE.toFixed(1) : "—", sub2: "Median, not mean — resistant to outliers" },
     { label: isSingleDay ? "Total dollar volume" : "Total dollar volume (period)", value: fmtCompact(totalDollarVol) },
-    { label: "Average volatility (1Y ann.)", value: avgVol.toFixed(1) + "%" },
+    { label: "Average volatility (period, ann.)", value: avgVol.toFixed(1) + "%" },
     { label: "Breadth — up vs. down", value: `${up} / ${filtered.length}`, sub2: `${down} declining` },
   ];
   tiles.forEach(tl => {
-    const div = document.createElement("div"); div.className = "panel kpi";
-    div.innerHTML = `<p class="label">${tl.label}</p><div class="value${tl.cls ? (" "+tl.cls) : ""}">${tl.value}</div>${tl.sub2 ? `<div class="sub2">${tl.sub2}</div>` : ""}`;
+    const div = document.createElement("div"); div.className = "panel kpi" + (tl.onClick ? " kpi-clickable" : "");
+    div.innerHTML = `<p class="label">${tl.label}</p><div class="value${tl.cls ? (" "+tl.cls) : ""}" style="${tl.value.length>10?"font-size:18px;":""}">${tl.value}</div>${tl.sub2 ? `<div class="sub2">${tl.sub2}</div>` : ""}`;
+    if (tl.onClick) div.addEventListener("click", tl.onClick);
     container.appendChild(div);
   });
 }
@@ -211,16 +257,16 @@ function renderSectorSection(filtered) {
 
 /* ---------------- risk analysis ---------------- */
 function renderRiskTable(filtered) {
-  const rows = [...filtered].sort((a,b) => M[b].vol1y - M[a].vol1y).slice(0,12);
+  const rows = [...filtered].sort((a,b) => PERIOD.metrics[b].vol - PERIOD.metrics[a].vol).slice(0,12);
   const container = document.getElementById("risk-table");
-  let html = '<table class="dtable" style="font-size:12px"><thead><tr><th>Ticker</th><th>Vol (1Y ann.)</th><th>Beta</th><th>Sharpe</th><th>Max DD (5Y)</th></tr></thead><tbody>';
+  let html = '<table class="dtable" style="font-size:12px"><thead><tr><th>Ticker</th><th>Company</th><th>Vol (ann.)</th><th>Beta</th><th>Sharpe</th><th>Max DD (5Y)</th></tr></thead><tbody>';
   rows.forEach(t => {
-    const m = M[t];
-    html += `<tr data-t="${t}"><td style="font-weight:700">${t}</td><td>${m.vol1y.toFixed(1)}%</td><td>${m.beta.toFixed(2)}</td><td>${m.sharpe1y.toFixed(2)}</td><td class="neg">${m.mdd.toFixed(1)}%</td></tr>`;
+    const m = M[t], p = PERIOD.metrics[t], s = DATA.stocks[t];
+    html += `<tr data-t="${t}"><td style="font-weight:700">${t}</td><td>${truncateName(s.name,22)}</td><td>${p.vol.toFixed(1)}%</td><td>${p.beta.toFixed(2)}</td><td>${p.sharpe.toFixed(2)}</td><td class="neg">${m.mdd.toFixed(1)}%</td></tr>`;
   });
   html += "</tbody></table>";
   container.innerHTML = html;
-  container.querySelectorAll("tr[data-t]").forEach(tr => tr.addEventListener("click", () => selectTicker(tr.dataset.t)));
+  container.querySelectorAll("tr[data-t]").forEach(tr => tr.addEventListener("click", () => openCompanyPage(tr.dataset.t)));
 }
 function renderRollingVol() {
   const rv = rollingVol(benchRet, 30);
@@ -292,7 +338,7 @@ function renderCorrelation(filtered) {
   const labelSpace = 62;
   const W = labelSpace + n*cell, H = labelSpace + n*cell;
   const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, style: `width:${Math.max(600,W)}px` });
-  const rets = {}; filtered.forEach(t => rets[t] = M[t].ret1y);
+  const rets = {}; filtered.forEach(t => rets[t] = PERIOD.metrics[t].retSlice);
   filtered.forEach((rt, ri) => {
     const rowLbl = el("text", { class: "axis-label", x: labelSpace-4, y: labelSpace+ri*cell+cell*0.72, "text-anchor": "end", style: "font-size:8px" });
     rowLbl.textContent = rt; svg.appendChild(rowLbl);
@@ -306,7 +352,7 @@ function renderCorrelation(filtered) {
       rect.addEventListener("pointerenter", () => {
         const r = rect.getBoundingClientRect();
         const box = document.createElement("div");
-        box.appendChild(ttHead(rt + " × " + ct));
+        box.appendChild(ttHead(`${rt} (${DATA.stocks[rt].name}) × ${ct} (${DATA.stocks[ct].name})`));
         box.appendChild(ttRow(divergingColor(corr,1), "Correlation", corr.toFixed(2)));
         showTooltip(r.left+r.width/2, r.top, box);
       });
@@ -324,20 +370,31 @@ function renderReturnsHist(filtered) {
 }
 function renderCagrScatter(filtered) {
   buildSectorLegend(document.getElementById("cagr-legend"));
+  const isSingleDay = state.period === "1D";
+  document.getElementById("retvol-sub").textContent = isSingleDay
+    ? "Period return vs. volatility (both annualized-vol basis) · bubble size = market cap · color = sector"
+    : "Period return vs. volatility over the selected period · bubble size = market cap · color = sector";
   const pts = filtered.map(t => {
-    const s = DATA.stocks[t], m = M[t];
+    const s = DATA.stocks[t], p = PERIOD.metrics[t];
     return {
-      x: m.vol1y, y: m.cagr, size: s.marketCap, color: sectorColor(s.sector), label: `${t} — ${s.name}`,
+      x: p.vol, y: p.periodReturn, size: s.marketCap, color: sectorColor(s.sector), label: `${t} — ${s.name}`, ticker: t,
       tooltip: [
         { color: sectorColor(s.sector), name: "Sector", value: s.sector },
-        { color: cssVar("--muted"), name: "Volatility (1Y)", value: m.vol1y.toFixed(1)+"%" },
-        { color: cssVar("--muted"), name: "CAGR (5Y)", value: fmtPct(m.cagr,1) },
+        { color: cssVar("--muted"), name: "Volatility", value: p.vol.toFixed(1)+"%" },
+        { color: cssVar("--muted"), name: "Return (period)", value: fmtPct(p.periodReturn,1) },
       ],
-      onClick: () => selectTicker(t),
+      onClick: () => openCompanyPage(t),
     };
   });
-  if (pts.length) scatterChart(document.getElementById("cagr-scatter"), pts, { w: 560, h: 320, yZeroLine: true, xfmt: (v) => v.toFixed(0)+"%", yfmt: (v) => v.toFixed(0)+"%" });
-  else document.getElementById("cagr-scatter").innerHTML = "";
+  if (pts.length) {
+    const byReturn = [...pts].sort((a,b) => b.y - a.y);
+    const labelSet = new Set([byReturn[0]?.ticker, byReturn[byReturn.length-1]?.ticker,
+      [...pts].sort((a,b)=>b.x-a.x)[0]?.ticker].filter(Boolean));
+    scatterChart(document.getElementById("cagr-scatter"), pts, {
+      w: 620, h: 380, yZeroLine: true, xMedianLine: true, maxRadius: 14,
+      xfmt: (v) => v.toFixed(0)+"%", yfmt: (v) => v.toFixed(0)+"%", directLabelTickers: labelSet,
+    });
+  } else document.getElementById("cagr-scatter").innerHTML = "";
 }
 
 /* ---------------- company table ---------------- */
@@ -434,9 +491,15 @@ function renderMacdChart(container, dates, macdArr, signalArr, histArr) {
   svg.appendChild(el("path", { d: lineD(signalArr), class: "trend-line", stroke: cssVar("--warning") }));
   container.appendChild(svg);
 }
-function renderDetail() {
+function ratioTile(label, val, cls) {
+  const tile = document.createElement("div"); tile.className = "ratio-tile";
+  tile.innerHTML = `<div class="rl">${label}</div><div class="rv ${cls||""}">${val}</div>`;
+  return tile;
+}
+function fmtPct100(frac, d=1) { return frac == null ? "—" : fmtPct(frac*100, d); }
+function renderCompanyPage() {
   const t = state.selectedTicker;
-  const s = DATA.stocks[t], m = M[t];
+  const s = DATA.stocks[t], m = M[t], p = PERIOD.metrics[t];
   const cache = getDetailCache(t);
   const dates = DATA.dates, N = dates.length;
   const range = state.range || "1Y";
@@ -444,52 +507,99 @@ function renderDetail() {
   const sliceArr = (arr) => arr.slice(startIdx);
   const dSlice = sliceArr(dates), closeSlice = sliceArr(s.close), volSlice = sliceArr(s.volume);
 
-  document.getElementById("d-tk").textContent = t;
-  document.getElementById("d-nm").textContent = s.name + " · " + s.sector;
+  document.getElementById("cv-scope").textContent = t + " · " + s.sector;
+  document.getElementById("cv-name").textContent = s.name + " (" + t + ")";
+  document.getElementById("cv-industry").textContent = s.industry || s.sector;
+  document.getElementById("cv-price").textContent = fmtUsd(s.close[N-1]);
+  const chg = document.getElementById("cv-change");
+  chg.textContent = fmtPct(m.latestReturn) + " today";
+  chg.className = "cv-change " + (m.latestReturn >= 0 ? "pos" : "neg");
 
-  const ratios = [
-    ["Price", fmtUsd(s.close[N-1])],
-    ["Daily %", fmtPct(m.latestReturn), m.latestReturn >= 0 ? "pos" : "neg"],
-    ["Market cap", fmtCompact(s.marketCap)],
-    ["P/E ratio", s.trailingPE != null ? s.trailingPE.toFixed(1) : "—"],
-    ["Beta", s.beta != null ? s.beta.toFixed(2) : "—"],
-    ["Dividend yield", s.dividendYield ? s.dividendYield.toFixed(2)+"%" : "—"],
-    ["Volatility (1Y, ann.)", m.vol1y.toFixed(1)+"%"],
-    ["Sharpe ratio (1Y)", m.sharpe1y.toFixed(2)],
+  const technical = [
+    ["Volatility (period, ann.)", p.vol.toFixed(1)+"%"],
+    ["Sharpe ratio (period)", p.sharpe.toFixed(2)],
+    ["Beta (period)", p.beta.toFixed(2)],
     ["Max drawdown (5Y)", m.mdd.toFixed(1)+"%", "neg"],
-    ["CAGR (5Y)", fmtPct(m.cagr,1), m.cagr>=0?"pos":"neg"],
     ["Momentum (1Y return)", fmtPct(m.momentum,1), m.momentum>=0?"pos":"neg"],
     ["52-week high distance", fmtPct(m.high52dist,1), m.high52dist>=-1?"pos":"neg"],
+    ["CAGR (5Y)", fmtPct(m.cagr,1), m.cagr>=0?"pos":"neg"],
   ];
-  const rgrid = document.getElementById("d-ratios"); rgrid.innerHTML = "";
-  ratios.forEach(([label,val,cls]) => {
-    const tile = document.createElement("div"); tile.className = "ratio-tile";
-    tile.innerHTML = `<div class="rl">${label}</div><div class="rv ${cls||""}">${val}</div>`;
-    rgrid.appendChild(tile);
-  });
+  const tgrid = document.getElementById("cv-technical-ratios"); tgrid.innerHTML = "";
+  technical.forEach(([l,v,c]) => tgrid.appendChild(ratioTile(l,v,c)));
 
-  const showMA = Array.from(document.querySelectorAll(".d-ma:checked")).map(cb => cb.value);
-  const showBB = document.getElementById("d-bb").checked;
-  const priceSeries = [];
-  if (showBB) {
-    priceSeries.push({ name: "Bollinger upper", values: sliceArr(cache.bb.upper), color: cssVar("--sec-1"), dashed: true });
-    priceSeries.push({ name: "Bollinger lower", values: sliceArr(cache.bb.lower), color: cssVar("--sec-1"), dashed: true });
-  }
+  const fundamental = [
+    ["Market cap", fmtCompact(s.marketCap)],
+    ["P/E ratio (trailing)", s.trailingPE != null ? s.trailingPE.toFixed(1) : "—"],
+    ["P/E ratio (forward)", s.forwardPE != null ? s.forwardPE.toFixed(1) : "—"],
+    ["EPS (trailing)", s.trailingEps != null ? fmtUsd(s.trailingEps) : "—"],
+    ["EPS (forward)", s.forwardEps != null ? fmtUsd(s.forwardEps) : "—"],
+    ["Price / book", s.priceToBook != null ? s.priceToBook.toFixed(1) : "—"],
+    ["Dividend yield", s.dividendYield ? s.dividendYield.toFixed(2)+"%" : "—"],
+    ["Return on equity", fmtPct100(s.returnOnEquity)],
+    ["Profit margin", fmtPct100(s.profitMargins)],
+    ["Revenue growth (YoY)", fmtPct100(s.revenueGrowth), (s.revenueGrowth||0)>=0?"pos":"neg"],
+    ["Total revenue", s.totalRevenue ? fmtCompact(s.totalRevenue) : "—"],
+    ["Free cash flow", s.freeCashflow ? fmtCompact(s.freeCashflow) : "—"],
+    ["Debt / equity", s.debtToEquity != null ? s.debtToEquity.toFixed(1)+"%" : "—"],
+    ["Analyst rating", s.recommendationKey ? s.recommendationKey.replace(/_/g," ").replace(/\b\w/g, c=>c.toUpperCase()) : "—"],
+    ["Analyst target price", s.targetMeanPrice ? fmtUsd(s.targetMeanPrice) : "—"],
+    ["Analyst coverage", s.numberOfAnalystOpinions ? s.numberOfAnalystOpinions + " analysts" : "—"],
+  ];
+  const fgrid = document.getElementById("cv-fundamental-ratios"); fgrid.innerHTML = "";
+  fundamental.forEach(([l,v,c]) => fgrid.appendChild(ratioTile(l,v,c)));
+
+  const showMA = Array.from(document.querySelectorAll(".cv-ma:checked")).map(cb => cb.value);
+  const showBB = document.getElementById("cv-bb").checked;
   const maColors = { "20": "#6da7ec", "50": "#2a78d6", "200": "#184f95" };
-  showMA.forEach(w => {
-    const arr = w === "20" ? cache.sma20 : w === "50" ? cache.sma50 : cache.sma200;
-    priceSeries.push({ name: `SMA ${w}`, values: sliceArr(arr), color: maColors[w] });
-  });
-  priceSeries.push({ name: "Close", values: closeSlice, color: cssVar("--ink"), fill: true });
-  renderLineChart(document.getElementById("d-price"), dSlice, priceSeries, { w: 460, h: 220, yfmt: (v) => "$"+v.toFixed(0), vfmt: (v) => "$"+v.toFixed(2) });
+  const chartType = state.cvChartType || "line";
 
-  renderVolumeBars(document.getElementById("d-volume"), dSlice, closeSlice, volSlice, startIdx, s.close);
+  if (chartType === "candle") {
+    const overlays = [];
+    if (showBB) {
+      overlays.push({ name: "Bollinger upper", values: sliceArr(cache.bb.upper), color: cssVar("--sec-1"), dashed: true });
+      overlays.push({ name: "Bollinger lower", values: sliceArr(cache.bb.lower), color: cssVar("--sec-1"), dashed: true });
+    }
+    showMA.forEach(w => {
+      const arr = w === "20" ? cache.sma20 : w === "50" ? cache.sma50 : cache.sma200;
+      overlays.push({ name: `SMA ${w}`, values: sliceArr(arr), color: maColors[w] });
+    });
+    renderCandlestick(document.getElementById("cv-price-chart"), dSlice,
+      { open: sliceArr(s.open), high: sliceArr(s.high), low: sliceArr(s.low), close: closeSlice },
+      overlays, { w: 460, h: 260, yfmt: (v) => "$"+v.toFixed(0) });
+  } else {
+    const priceSeries = [];
+    if (showBB) {
+      priceSeries.push({ name: "Bollinger upper", values: sliceArr(cache.bb.upper), color: cssVar("--sec-1"), dashed: true });
+      priceSeries.push({ name: "Bollinger lower", values: sliceArr(cache.bb.lower), color: cssVar("--sec-1"), dashed: true });
+    }
+    showMA.forEach(w => {
+      const arr = w === "20" ? cache.sma20 : w === "50" ? cache.sma50 : cache.sma200;
+      priceSeries.push({ name: `SMA ${w}`, values: sliceArr(arr), color: maColors[w] });
+    });
+    priceSeries.push({ name: "Close", values: closeSlice, color: cssVar("--ink"), fill: true });
+    renderLineChart(document.getElementById("cv-price-chart"), dSlice, priceSeries, { w: 460, h: 260, yfmt: (v) => "$"+v.toFixed(0), vfmt: (v) => "$"+v.toFixed(2) });
+  }
 
-  renderLineChart(document.getElementById("d-rsi"), dSlice, [{ name: "RSI", values: sliceArr(cache.rsi), color: cssVar("--accent"), fill: true }],
+  renderVolumeBars(document.getElementById("cv-volume"), dSlice, closeSlice, volSlice, startIdx, s.close);
+
+  renderLineChart(document.getElementById("cv-rsi"), dSlice, [{ name: "RSI", values: sliceArr(cache.rsi), color: cssVar("--accent"), fill: true }],
     { w: 460, h: 160, fixedRange: [0,100], yfmt: (v) => v.toFixed(0), vfmt: (v) => v.toFixed(1),
       refLines: [{ v: 70, color: cssVar("--critical") }, { v: 30, color: cssVar("--good") }] });
 
-  renderMacdChart(document.getElementById("d-macd"), dSlice, sliceArr(cache.macd.macd), sliceArr(cache.macd.signal), sliceArr(cache.macd.hist));
+  renderMacdChart(document.getElementById("cv-macd"), dSlice, sliceArr(cache.macd.macd), sliceArr(cache.macd.signal), sliceArr(cache.macd.hist));
+}
+function openCompanyPage(t) {
+  state.selectedTicker = t;
+  document.getElementById("cv-ticker").value = t;
+  document.getElementById("dashboard-view").style.display = "none";
+  document.getElementById("company-view").style.display = "block";
+  window.scrollTo(0, 0);
+  renderCompanyPage();
+}
+function closeCompanyPage() {
+  document.getElementById("company-view").style.display = "none";
+  document.getElementById("dashboard-view").style.display = "block";
+  window.scrollTo(0, 0);
 }
 
 /* ---------------- ticker tape ---------------- */
@@ -550,12 +660,17 @@ function populateFilters() {
   const sectorSel = document.getElementById("f-sector");
   const sectors = [...new Set(TICKERS.map(t => DATA.stocks[t].sector))].sort();
   sectorSel.innerHTML = '<option value="All">All</option>' + sectors.map(s => `<option value="${s}">${s}</option>`).join("");
-  const dSel = document.getElementById("d-ticker");
-  dSel.innerHTML = [...TICKERS].sort().map(t => `<option value="${t}">${t} — ${DATA.stocks[t].name}</option>`).join("");
-  dSel.value = state.selectedTicker;
+  const cvSel = document.getElementById("cv-ticker");
+  cvSel.innerHTML = [...TICKERS].sort().map(t => `<option value="${t}">${t} — ${DATA.stocks[t].name}</option>`).join("");
+  cvSel.value = state.selectedTicker;
 }
 function wireEvents() {
   document.getElementById("f-search").addEventListener("input", (e) => { state.search = e.target.value; renderAll(); });
+  document.getElementById("f-search").addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    const matches = getFiltered();
+    if (matches.length === 1) openCompanyPage(matches[0]);
+  });
   document.getElementById("f-sector").addEventListener("change", (e) => { state.sector = e.target.value; renderAll(); });
   document.getElementById("f-cap").addEventListener("change", (e) => { state.cap = e.target.value; renderAll(); });
   document.getElementById("f-pe").addEventListener("change", (e) => { state.pe = e.target.value; renderAll(); });
@@ -566,16 +681,24 @@ function wireEvents() {
     document.getElementById("f-cap").value = "All"; document.getElementById("f-pe").value = "All"; document.getElementById("f-div").checked = false;
     renderAll();
   });
-  document.getElementById("d-ticker").addEventListener("change", (e) => { state.selectedTicker = e.target.value; renderDetail(); });
-  document.getElementById("d-range").addEventListener("click", (e) => {
+  document.getElementById("cv-back").addEventListener("click", closeCompanyPage);
+  document.getElementById("cv-ticker").addEventListener("change", (e) => { state.selectedTicker = e.target.value; renderCompanyPage(); });
+  document.getElementById("cv-range").addEventListener("click", (e) => {
     if (e.target.tagName !== "BUTTON") return;
-    document.querySelectorAll("#d-range button").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll("#cv-range button").forEach(b => b.classList.remove("active"));
     e.target.classList.add("active");
     state.range = e.target.dataset.range;
-    renderDetail();
+    renderCompanyPage();
   });
-  document.querySelectorAll(".d-ma").forEach(cb => cb.addEventListener("change", renderDetail));
-  document.getElementById("d-bb").addEventListener("change", renderDetail);
+  document.getElementById("cv-chart-type").addEventListener("click", (e) => {
+    if (e.target.tagName !== "BUTTON") return;
+    document.querySelectorAll("#cv-chart-type button").forEach(b => b.classList.remove("active"));
+    e.target.classList.add("active");
+    state.cvChartType = e.target.dataset.charttype;
+    renderCompanyPage();
+  });
+  document.querySelectorAll(".cv-ma").forEach(cb => cb.addEventListener("change", renderCompanyPage));
+  document.getElementById("cv-bb").addEventListener("change", renderCompanyPage);
   document.querySelectorAll("#company-table th").forEach(th => th.addEventListener("click", () => {
     const k = th.dataset.key;
     if (tableSort.key === k) tableSort.dir = tableSort.dir === "asc" ? "desc" : "asc"; else { tableSort.key = k; tableSort.dir = "desc"; }
@@ -604,7 +727,7 @@ function rerenderForTheme() {
   tapeKey = "";
   renderAll();
   renderRollingVol();
-  renderDetail();
+  if (document.getElementById("company-view").style.display !== "none") renderCompanyPage();
 }
 function applyTheme(mode) {
   if (mode === "system") delete document.documentElement.dataset.theme;
@@ -676,6 +799,7 @@ replayBtn.addEventListener("click", () => {
 
 state.range = "1Y";
 state.period = "1D";
+state.cvChartType = "line";
 let savedTheme = "system", savedAccent = "classic";
 try {
   savedTheme = localStorage.getItem("nd50-theme") || "system";
@@ -698,4 +822,3 @@ populateFilters();
 wireEvents();
 renderAll();
 renderRollingVol();
-renderDetail();

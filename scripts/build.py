@@ -40,8 +40,17 @@ def fetch():
         df.index = df.index.strftime("%Y-%m-%d")
         price_data[t] = df
 
-    print("Fetching fundamentals (sector, P/E, beta, market cap, 52w range)...")
+    print("Fetching fundamentals (sector, P/E, beta, market cap, 52w range, EPS, margins, analyst rating)...")
     fundamentals = {}
+    default_fields = {
+        "name": None, "sector": "Other", "industry": "", "marketCap": 0,
+        "trailingPE": None, "beta": None, "fiftyTwoWeekHigh": None, "fiftyTwoWeekLow": None,
+        "dividendYield": None, "averageVolume": None, "trailingEps": None, "forwardEps": None,
+        "forwardPE": None, "priceToBook": None, "returnOnEquity": None, "profitMargins": None,
+        "revenueGrowth": None, "earningsGrowth": None, "totalRevenue": None, "grossMargins": None,
+        "freeCashflow": None, "recommendationKey": None, "numberOfAnalystOpinions": None,
+        "targetMeanPrice": None, "debtToEquity": None,
+    }
     for i, t in enumerate(TICKERS):
         for attempt in range(3):
             try:
@@ -57,14 +66,27 @@ def fetch():
                     "fiftyTwoWeekLow": info.get("fiftyTwoWeekLow"),
                     "dividendYield": info.get("dividendYield"),
                     "averageVolume": info.get("averageVolume"),
+                    "trailingEps": info.get("trailingEps"),
+                    "forwardEps": info.get("forwardEps"),
+                    "forwardPE": info.get("forwardPE"),
+                    "priceToBook": info.get("priceToBook"),
+                    "returnOnEquity": info.get("returnOnEquity"),
+                    "profitMargins": info.get("profitMargins"),
+                    "revenueGrowth": info.get("revenueGrowth"),
+                    "earningsGrowth": info.get("earningsGrowth"),
+                    "totalRevenue": info.get("totalRevenue"),
+                    "grossMargins": info.get("grossMargins"),
+                    "freeCashflow": info.get("freeCashflow"),
+                    "recommendationKey": info.get("recommendationKey"),
+                    "numberOfAnalystOpinions": info.get("numberOfAnalystOpinions"),
+                    "targetMeanPrice": info.get("targetMeanPrice"),
+                    "debtToEquity": info.get("debtToEquity"),
                 }
                 break
             except Exception as e:
                 if attempt == 2:
                     print(f"  failed {t}: {e}")
-                    fundamentals[t] = {"name": t, "sector": "Other", "industry": "", "marketCap": 0,
-                                        "trailingPE": None, "beta": None, "fiftyTwoWeekHigh": None,
-                                        "fiftyTwoWeekLow": None, "dividendYield": None, "averageVolume": None}
+                    fundamentals[t] = {**default_fields, "name": t}
                 else:
                     time.sleep(1)
         if (i + 1) % 10 == 0:
@@ -81,17 +103,38 @@ def build_compact_dataset(price_data, fundamentals):
         df = price_data[t]
         d_dates = list(df["Date"]) if "Date" in df.columns else list(df.index)
         assert d_dates == dates, f"date mismatch for {t}"
+        def r2(v):
+            return round(v, 2) if v is not None else None
+
         stocks[t] = {
             "name": info["name"],
             "sector": info["sector"],
             "industry": info["industry"],
             "marketCap": info["marketCap"],
-            "trailingPE": round(info["trailingPE"], 2) if info["trailingPE"] else None,
-            "beta": round(info["beta"], 2) if info["beta"] else None,
+            "trailingPE": r2(info["trailingPE"]),
+            "beta": r2(info["beta"]),
             "fiftyTwoWeekHigh": info["fiftyTwoWeekHigh"],
             "fiftyTwoWeekLow": info["fiftyTwoWeekLow"],
             "dividendYield": info["dividendYield"],
             "averageVolume": info["averageVolume"],
+            "trailingEps": r2(info.get("trailingEps")),
+            "forwardEps": r2(info.get("forwardEps")),
+            "forwardPE": r2(info.get("forwardPE")),
+            "priceToBook": r2(info.get("priceToBook")),
+            "returnOnEquity": info.get("returnOnEquity"),
+            "profitMargins": info.get("profitMargins"),
+            "revenueGrowth": info.get("revenueGrowth"),
+            "earningsGrowth": info.get("earningsGrowth"),
+            "totalRevenue": info.get("totalRevenue"),
+            "grossMargins": info.get("grossMargins"),
+            "freeCashflow": info.get("freeCashflow"),
+            "recommendationKey": info.get("recommendationKey"),
+            "numberOfAnalystOpinions": info.get("numberOfAnalystOpinions"),
+            "targetMeanPrice": r2(info.get("targetMeanPrice")),
+            "debtToEquity": r2(info.get("debtToEquity")),
+            "open": [round(float(c), 2) for c in df["Open"]],
+            "high": [round(float(c), 2) for c in df["High"]],
+            "low": [round(float(c), 2) for c in df["Low"]],
             "close": [round(float(c), 2) for c in df["Close"]],
             "volume": [int(v) for v in df["Volume"]],
         }
