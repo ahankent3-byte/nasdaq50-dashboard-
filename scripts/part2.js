@@ -275,7 +275,7 @@ function renderRollingVol() {
   const dSlice = dates.slice(-showN), rvSlice = rv.slice(-showN);
   renderLineChart(document.getElementById("rolling-vol"), dSlice,
     [{ name: "Nasdaq Composite volatility", values: rvSlice, color: cssVar("--accent"), fill: true }],
-    { w: 460, h: 200, yfmt: (v) => v.toFixed(0)+"%", vfmt: (v) => v.toFixed(1)+"%" });
+    { w: 460, h: 200, yfmt: (v) => v.toFixed(0)+"%", vfmt: (v) => v.toFixed(1)+"%", endBadge: true });
 }
 
 /* ---------------- valuation scatter ---------------- */
@@ -486,9 +486,9 @@ function renderMacdChart(container, dates, macdArr, signalArr, histArr) {
     const yv = yScale(v), top = Math.min(y0,yv), h = Math.max(1, Math.abs(yv-y0));
     svg.appendChild(el("rect", { x, y: top, width: barW, height: h, fill: v>=0?cssVar("--good"):cssVar("--critical"), opacity: 0.55 }));
   });
-  const lineD = (arr) => { let d = "", started = false; arr.forEach((v,i) => { if (v == null) { started=false; return; } const x = padL+innerW*(i/n); d += (started?"L":"M")+x+","+yScale(v)+" "; started=true; }); return d; };
-  svg.appendChild(el("path", { d: lineD(macdArr), class: "trend-line", stroke: cssVar("--sec-1") }));
-  svg.appendChild(el("path", { d: lineD(signalArr), class: "trend-line", stroke: cssVar("--warning") }));
+  const xScale = (i) => padL + innerW * (i/n);
+  svg.appendChild(el("path", { d: smoothLinePath(macdArr, xScale, yScale), class: "trend-line", stroke: cssVar("--sec-1") }));
+  svg.appendChild(el("path", { d: smoothLinePath(signalArr, xScale, yScale), class: "trend-line", stroke: cssVar("--warning") }));
   container.appendChild(svg);
 }
 function ratioTile(label, val, cls) {
@@ -576,15 +576,16 @@ function renderCompanyPage() {
       const arr = w === "20" ? cache.sma20 : w === "50" ? cache.sma50 : cache.sma200;
       priceSeries.push({ name: `SMA ${w}`, values: sliceArr(arr), color: maColors[w] });
     });
-    priceSeries.push({ name: "Close", values: closeSlice, color: cssVar("--ink"), fill: true });
-    renderLineChart(document.getElementById("cv-price-chart"), dSlice, priceSeries, { w: 460, h: 260, yfmt: (v) => "$"+v.toFixed(0), vfmt: (v) => "$"+v.toFixed(2) });
+    const periodUp = closeSlice[closeSlice.length-1] >= closeSlice[0];
+    priceSeries.push({ name: "Close", values: closeSlice, color: periodUp ? cssVar("--good") : cssVar("--critical"), fill: true });
+    renderLineChart(document.getElementById("cv-price-chart"), dSlice, priceSeries, { w: 460, h: 260, yfmt: (v) => "$"+v.toFixed(0), vfmt: (v) => "$"+v.toFixed(2), endBadge: true });
   }
 
   renderVolumeBars(document.getElementById("cv-volume"), dSlice, closeSlice, volSlice, startIdx, s.close);
 
   renderLineChart(document.getElementById("cv-rsi"), dSlice, [{ name: "RSI", values: sliceArr(cache.rsi), color: cssVar("--accent"), fill: true }],
-    { w: 460, h: 160, fixedRange: [0,100], yfmt: (v) => v.toFixed(0), vfmt: (v) => v.toFixed(1),
-      refLines: [{ v: 70, color: cssVar("--critical") }, { v: 30, color: cssVar("--good") }] });
+    { w: 460, h: 160, fixedRange: [0,100], yfmt: (v) => v.toFixed(0), vfmt: (v) => v.toFixed(1), endBadge: true,
+      refLines: [{ v: 70, color: cssVar("--critical"), label: "70" }, { v: 30, color: cssVar("--good"), label: "30" }] });
 
   renderMacdChart(document.getElementById("cv-macd"), dSlice, sliceArr(cache.macd.macd), sliceArr(cache.macd.signal), sliceArr(cache.macd.hist));
 }
