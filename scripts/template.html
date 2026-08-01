@@ -363,6 +363,21 @@
   .cv-change.neg { color: var(--critical); }
   .chart-type-toggle button { min-width: 40px; }
 
+  /* Performance & outlook table */
+  .mini-btn {
+    background: transparent; border: 1px solid var(--border); color: var(--ink-2);
+    border-radius: 7px; padding: 6px 12px; font-size: 12px; cursor: pointer; font-family: inherit;
+  }
+  .mini-btn:hover { background: var(--surface-2); color: var(--ink); }
+  .rsi-chip {
+    display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 20px;
+    font-size: 9.5px; font-weight: 700; vertical-align: 1px;
+  }
+  .rsi-chip.hot  { background: color-mix(in srgb, var(--warning) 18%, transparent); color: var(--warning); }
+  .rsi-chip.cold { background: color-mix(in srgb, var(--div-blue) 18%, transparent); color: var(--div-blue); }
+  td.spark-cell { padding-top: 4px; padding-bottom: 4px; }
+  td.spark-cell svg { display: block; }
+
   footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
 
   @media (max-width: 1080px) {
@@ -541,6 +556,34 @@
   </div>
 
   <!-- 9. COMPANY TABLE -->
+  <div class="section">
+    <div class="section-title"><h2>Price Performance &amp; Outlook</h2><span class="q">How did each stock travel — and which way is the trend leaning?</span></div>
+    <div class="panel">
+      <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;">
+        <p class="sub" id="perf-sub" style="margin:0;">Start → end close over the selected period · click a row to open the company page</p>
+        <button id="perf-export" class="mini-btn" style="margin-left:auto;">Download CSV</button>
+      </div>
+      <div class="table-wrap table-scroll" style="margin-top:10px;">
+        <table class="dtable" id="perf-table">
+          <thead><tr>
+            <th data-key="symbol">Ticker</th>
+            <th data-key="name">Company</th>
+            <th>Trend</th>
+            <th data-key="startClose" id="perf-th-start">Start</th>
+            <th data-key="endClose" id="perf-th-end">End</th>
+            <th data-key="ret">Change</th>
+            <th data-key="vol">Volatility</th>
+            <th data-key="rsi">RSI (14)</th>
+            <th data-key="high52dist">vs 52W High</th>
+            <th data-key="proj">Proj. 1M trend</th>
+          </tr></thead>
+          <tbody id="perf-tbody"></tbody>
+        </table>
+      </div>
+      <p class="sub" style="margin:10px 0 0;">Volatility is annualized over the selected period. Projection = the trailing 63-session log-price trend extrapolated 21 sessions forward (trend fit R² on hover) — a momentum read, not a forecast or investment advice.</p>
+    </div>
+  </div>
+
   <div class="section">
     <div class="section-title"><h2>Company Detail Table</h2><span class="q">Which companies deserve deeper investigation?</span></div>
     <div class="panel">

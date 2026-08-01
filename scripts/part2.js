@@ -754,6 +754,110 @@ function buildTape() {
   tape.appendChild(track);
 }
 
+/* ---------------- price performance & outlook table ---------------- */
+let perfSort = { key: "ret", dir: "desc" };
+const PROJ_CACHE = {}, RSI_CACHE = {};
+function trendProjection(t) {
+  // OLS on log(close) over the trailing 63 sessions, extrapolated 21 forward
+  if (PROJ_CACHE[t]) return PROJ_CACHE[t];
+  const close = DATA.stocks[t].close;
+  const ys = close.slice(-Math.min(63, close.length)).map(Math.log);
+  const n = ys.length;
+  if (n < 10) return (PROJ_CACHE[t] = null);
+  const xm = (n-1)/2, ym = mean(ys);
+  let num = 0, den = 0;
+  ys.forEach((y, i) => { num += (i-xm)*(y-ym); den += (i-xm)*(i-xm); });
+  const slope = num/den;
+  let ssr = 0, sst = 0;
+  ys.forEach((y, i) => { const fit = ym + slope*(i-xm); ssr += (y-fit)*(y-fit); sst += (y-ym)*(y-ym); });
+  return (PROJ_CACHE[t] = { pct: (Math.exp(slope*21) - 1) * 100, r2: sst > 0 ? 1 - ssr/sst : 0 });
+}
+function latestRsi(t) {
+  if (t in RSI_CACHE) return RSI_CACHE[t];
+  const arr = rsi(DATA.stocks[t].close);
+  return (RSI_CACHE[t] = arr[arr.length-1]);
+}
+function sparkCell(closes, up) {
+  const w = 84, h = 22;
+  const min = Math.min(...closes), max = Math.max(...closes);
+  const span = (max - min) || 1;
+  const pts = closes.map((c, i) =>
+    (closes.length > 1 ? i/(closes.length-1)*w : w/2).toFixed(1) + "," + (h-2 - (c-min)/span*(h-4)).toFixed(1)).join(" ");
+  const color = cssVar(up ? "--good" : "--critical");
+  return `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" style="overflow:visible" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+}
+function buildPerfRows(filtered) {
+  const { startIdx, endIdx } = PERIOD;
+  return filtered.map(t => {
+    const s = DATA.stocks[t], p = PERIOD.metrics[t], m = M[t];
+    const proj = trendProjection(t);
+    return {
+      symbol: t, name: s.name, closes: s.close.slice(startIdx, endIdx+1),
+      startClose: s.close[startIdx], endClose: s.close[endIdx],
+      ret: p.periodReturn, vol: isFinite(p.vol) ? p.vol : null,
+      rsi: latestRsi(t), high52dist: m.high52dist,
+      proj: proj ? proj.pct : null, projR2: proj ? proj.r2 : null,
+    };
+  });
+}
+function sortedPerfRows(filtered) {
+  const rows = buildPerfRows(filtered);
+  rows.sort((a,b) => {
+    let av = a[perfSort.key], bv = b[perfSort.key];
+    if (typeof av === "string") return perfSort.dir === "asc" ? av.localeCompare(bv) : bv.localeCompare(av);
+    if (av == null) av = -Infinity; if (bv == null) bv = -Infinity;
+    return perfSort.dir === "asc" ? av - bv : bv - av;
+  });
+  return rows;
+}
+function renderPerfTable(filtered) {
+  document.getElementById("perf-th-start").textContent = fmtDate(DATA.dates[PERIOD.startIdx]);
+  document.getElementById("perf-th-end").textContent = fmtDate(DATA.dates[PERIOD.endIdx]);
+  document.getElementById("perf-sub").textContent =
+    (state.period === "1D" ? "Previous close → latest close" : "Start → end close over the selected period")
+    + " · click a row to open the company page";
+  const rows = sortedPerfRows(filtered);
+  const tbody = document.getElementById("perf-tbody");
+  tbody.innerHTML = "";
+  rows.forEach(r => {
+    const tr = document.createElement("tr");
+    const rsiChip = r.rsi >= 70 ? '<span class="rsi-chip hot">overbought</span>'
+                  : r.rsi <= 30 ? '<span class="rsi-chip cold">oversold</span>' : "";
+    tr.innerHTML = `<td style="font-weight:700">${r.symbol}</td><td style="color:var(--ink-2)">${r.name}</td>
+      <td class="spark-cell">${sparkCell(r.closes, r.ret >= 0)}</td>
+      <td>${fmtUsd(r.startClose)}</td><td>${fmtUsd(r.endClose)}</td>
+      <td class="${r.ret>=0?'pos':'neg'}">${fmtPct(r.ret)}</td>
+      <td>${r.vol != null ? r.vol.toFixed(1)+"%" : "—"}</td>
+      <td>${r.rsi != null ? Math.round(r.rsi) : "—"}${rsiChip}</td>
+      <td class="${r.high52dist>=-1?'pos':'neg'}">${fmtPct(r.high52dist,1)}</td>
+      <td class="${r.proj>=0?'pos':'neg'}" title="Trend fit R² = ${r.projR2 != null ? r.projR2.toFixed(2) : "—"} · naive extrapolation, not a forecast">${r.proj != null ? fmtPct(r.proj,1) : "—"}</td>`;
+    tr.addEventListener("click", () => selectTicker(r.symbol));
+    tbody.appendChild(tr);
+  });
+  document.querySelectorAll("#perf-table th").forEach(th => {
+    th.classList.toggle("sorted", th.dataset.key === perfSort.key);
+    th.dataset.dir = perfSort.dir === "asc" ? "▲" : "▼";
+  });
+}
+function exportPerfCSV() {
+  const rows = sortedPerfRows(getFiltered());
+  const esc = (v) => { const s = String(v ?? ""); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const startD = DATA.dates[PERIOD.startIdx], endD = DATA.dates[PERIOD.endIdx];
+  const lines = [
+    ["Ticker","Company",`Close ${startD}`,`Close ${endD}`,"Change %","Volatility % (ann.)","RSI 14","Vs 52W High %","Projected 1M trend %","Trend R2"].join(","),
+    ...rows.map(r => [r.symbol, esc(r.name), r.startClose, r.endClose,
+      r.ret.toFixed(2), r.vol != null ? r.vol.toFixed(1) : "", r.rsi != null ? r.rsi.toFixed(0) : "",
+      r.high52dist != null ? r.high52dist.toFixed(1) : "", r.proj != null ? r.proj.toFixed(1) : "",
+      r.projR2 != null ? r.projR2.toFixed(2) : ""].join(",")),
+  ];
+  const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `nasdaq50_performance_${startD}_${endD}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
 /* ---------------- filters + init ---------------- */
 function renderAll() {
   computePeriod();
@@ -770,6 +874,7 @@ function renderAll() {
   renderCorrelation(filtered);
   renderReturnsHist(filtered);
   renderCagrScatter(filtered);
+  renderPerfTable(filtered);
   renderCompanyTable(filtered);
 }
 function populateFilters() {
@@ -820,6 +925,12 @@ function wireEvents() {
     if (tableSort.key === k) tableSort.dir = tableSort.dir === "asc" ? "desc" : "asc"; else { tableSort.key = k; tableSort.dir = "desc"; }
     renderCompanyTable(getFiltered());
   }));
+  document.querySelectorAll("#perf-table th[data-key]").forEach(th => th.addEventListener("click", () => {
+    const k = th.dataset.key;
+    if (perfSort.key === k) perfSort.dir = perfSort.dir === "asc" ? "desc" : "asc"; else { perfSort.key = k; perfSort.dir = "desc"; }
+    renderPerfTable(getFiltered());
+  }));
+  document.getElementById("perf-export").addEventListener("click", exportPerfCSV);
   document.getElementById("period-toggle").addEventListener("click", (e) => {
     if (e.target.tagName !== "BUTTON") return;
     document.querySelectorAll("#period-toggle button").forEach(b => b.classList.remove("active"));
