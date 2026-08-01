@@ -378,22 +378,22 @@
   td.spark-cell { padding-top: 4px; padding-bottom: 4px; }
   td.spark-cell svg { display: block; }
 
-  /* Sector accordion rows */
-  tr.sector-row td { padding: 0; background: var(--surface-2); }
-  tr.sector-row:hover td { background: color-mix(in srgb, var(--surface-2) 60%, var(--surface)); }
-  .sector-band {
-    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-    padding: 9px 12px; border-left: 3px solid transparent; cursor: pointer; user-select: none;
-  }
-  .sector-band .chev { font-size: 10px; color: var(--muted); transition: transform 0.15s ease; flex: none; }
-  .sector-band.open .chev { transform: rotate(90deg); }
-  .sector-band .nm { font-weight: 700; font-size: 13px; }
-  .sector-band .cnt { color: var(--muted); font-size: 11px; }
-  .sector-band .spark svg { display: block; }
-  .sector-band .avg { font-weight: 700; font-size: 13px; font-variant-numeric: tabular-nums; }
-  .sector-band .ext { color: var(--ink-2); font-size: 11.5px; }
-  .sector-band .ext b { font-weight: 700; }
+  /* Sector accordion rows — sector aggregates sit in the same columns as company data */
+  #perf-table th:nth-child(n+3), #perf-table td:nth-child(n+3) { text-align: right; }
+  #perf-table td:nth-child(2) { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  tr.sector-row td { background: var(--surface-2); cursor: pointer; user-select: none; }
+  tr.sector-row:hover td { background: color-mix(in srgb, var(--surface-2) 55%, var(--surface)); }
+  tr.sector-row td.sec-head { border-left: 3px solid transparent; }
+  .sec-head-inner { display: flex; align-items: center; gap: 9px; }
+  .sec-head-inner .chev { font-size: 9px; color: var(--muted); transition: transform 0.15s ease; flex: none; }
+  tr.sector-row.open .chev { transform: rotate(90deg); }
+  .sec-head-inner .nm { font-weight: 700; font-size: 12.5px; white-space: nowrap; }
+  .sec-head-inner .cnt { color: var(--muted); font-size: 11px; font-weight: 400; }
+  tr.sector-row td.dim, td.dim { color: var(--muted); }
   tr.child-row td:first-child { padding-left: 28px; }
+  #perf-table td.spark-cell svg { margin-left: auto; }
+  .rsi-hot  { color: var(--warning); font-weight: 700; }
+  .rsi-cold { color: var(--div-blue); font-weight: 700; }
 
   footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
 

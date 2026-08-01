@@ -843,8 +843,7 @@ function latestRsi(t) {
   const arr = rsi(DATA.stocks[t].close);
   return (RSI_CACHE[t] = arr[arr.length-1]);
 }
-function sparkCell(closes, up) {
-  const w = 84, h = 22;
+function sparkCell(closes, up, w = 70, h = 18) {
   const min = Math.min(...closes), max = Math.max(...closes);
   const span = (max - min) || 1;
   const pts = closes.map((c, i) =>
@@ -911,46 +910,51 @@ function renderPerfTable(filtered) {
   });
 
   const singleGroup = glist.length === 1;
+  const posNeg = (v) => v == null ? "dim" : v >= 0 ? "pos" : "neg";
+  const avgOf = (arr) => { const v = arr.filter(x => x != null && isFinite(x)); return v.length ? mean(v) : null; };
   glist.forEach(g => {
     const open = singleGroup || perfExpanded.has(g.sector);
     const idx = g.list.map(r => r.symbol);
     const sectorSpark = DATA.dates.slice(startIdx, endIdx + 1)
       .map((_, i) => mean(idx.map(t => DATA.stocks[t].close[startIdx + i] / DATA.stocks[t].close[startIdx])));
+    const aVol = avgOf(g.list.map(r => r.vol)), aRsi = avgOf(g.list.map(r => r.rsi));
+    const a52 = avgOf(g.list.map(r => r.high52dist)), aProj = avgOf(g.list.map(r => r.proj));
 
     const tr = document.createElement("tr");
-    tr.className = "sector-row";
-    const td = document.createElement("td");
-    td.colSpan = 10;
-    td.innerHTML = `<div class="sector-band${open ? " open" : ""}" style="border-left-color:${sectorColor(g.sector)}">
-      <span class="chev">▶</span>
-      <span class="nm">${g.sector}</span>
-      <span class="cnt">${g.list.length} ${g.list.length === 1 ? "company" : "companies"}</span>
-      <span class="spark">${sparkCell(sectorSpark, g.avg >= 0)}</span>
-      <span class="avg ${g.avg >= 0 ? "pos" : "neg"}">${fmtPct(g.avg)}</span>
-      <span class="ext">best <b>${g.best.symbol}</b> ${fmtPct(g.best.ret)}${g.list.length > 1 ? ` · worst <b>${g.worst.symbol}</b> ${fmtPct(g.worst.ret)}` : ""}</span>
-      ${g.hot ? `<span class="rsi-chip hot">${g.hot} overbought</span>` : ""}
-      ${g.cold ? `<span class="rsi-chip cold">${g.cold} oversold</span>` : ""}
-    </div>`;
-    td.addEventListener("click", () => {
+    tr.className = "sector-row" + (open ? " open" : "");
+    tr.title = `Best ${g.best.symbol} ${fmtPct(g.best.ret)}` +
+      (g.list.length > 1 ? ` · worst ${g.worst.symbol} ${fmtPct(g.worst.ret)}` : "") +
+      (g.hot ? ` · ${g.hot} overbought` : "") + (g.cold ? ` · ${g.cold} oversold` : "");
+    tr.innerHTML = `
+      <td class="sec-head" colspan="2" style="border-left-color:${sectorColor(g.sector)}">
+        <div class="sec-head-inner"><span class="chev">▶</span><span class="nm">${g.sector}</span><span class="cnt">${g.list.length}</span></div>
+      </td>
+      <td class="spark-cell">${sparkCell(sectorSpark, g.avg >= 0)}</td>
+      <td class="dim">—</td><td class="dim">—</td>
+      <td class="${posNeg(g.avg)}" style="font-weight:700">${fmtPct(g.avg)}</td>
+      <td>${aVol != null ? aVol.toFixed(1) + "%" : "—"}</td>
+      <td>${aRsi != null ? Math.round(aRsi) : "—"}</td>
+      <td class="${posNeg(a52 == null ? null : a52 + 1)}">${fmtPct(a52, 1)}</td>
+      <td class="${posNeg(aProj)}">${fmtPct(aProj, 1)}</td>`;
+    tr.addEventListener("click", () => {
       if (singleGroup) return;
       if (open) perfExpanded.delete(g.sector); else perfExpanded.add(g.sector);
       renderPerfTable(getFiltered());
     });
-    tr.appendChild(td);
     tbody.appendChild(tr);
 
     if (!open) return;
     g.list.forEach(r => {
       const ctr = document.createElement("tr");
       ctr.className = "child-row";
-      const rsiChip = r.rsi >= 70 ? '<span class="rsi-chip hot">overbought</span>'
-                    : r.rsi <= 30 ? '<span class="rsi-chip cold">oversold</span>' : "";
-      ctr.innerHTML = `<td style="font-weight:700">${r.symbol}</td><td style="color:var(--ink-2)">${r.name}</td>
+      const rsiCls = r.rsi >= 70 ? "rsi-hot" : r.rsi <= 30 ? "rsi-cold" : "";
+      const rsiTitle = r.rsi >= 70 ? "Overbought (RSI ≥ 70)" : r.rsi <= 30 ? "Oversold (RSI ≤ 30)" : "";
+      ctr.innerHTML = `<td style="font-weight:700">${r.symbol}</td><td style="color:var(--ink-2)" title="${r.name}">${r.name}</td>
         <td class="spark-cell">${sparkCell(r.closes, r.ret >= 0)}</td>
         <td>${fmtUsd(r.startClose)}</td><td>${fmtUsd(r.endClose)}</td>
         <td class="${r.ret>=0?'pos':'neg'}">${fmtPct(r.ret)}</td>
         <td>${r.vol != null ? r.vol.toFixed(1)+"%" : "—"}</td>
-        <td>${r.rsi != null ? Math.round(r.rsi) : "—"}${rsiChip}</td>
+        <td class="${rsiCls}" title="${rsiTitle}">${r.rsi != null ? Math.round(r.rsi) : "—"}</td>
         <td class="${r.high52dist>=-1?'pos':'neg'}">${fmtPct(r.high52dist,1)}</td>
         <td class="${r.proj>=0?'pos':'neg'}" title="Trend fit R² = ${r.projR2 != null ? r.projR2.toFixed(2) : "—"} · naive extrapolation, not a forecast">${r.proj != null ? fmtPct(r.proj,1) : "—"}</td>`;
       ctr.addEventListener("click", () => selectTicker(r.symbol));
