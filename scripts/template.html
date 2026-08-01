@@ -378,6 +378,23 @@
   td.spark-cell { padding-top: 4px; padding-bottom: 4px; }
   td.spark-cell svg { display: block; }
 
+  /* Sector accordion rows */
+  tr.sector-row td { padding: 0; background: var(--surface-2); }
+  tr.sector-row:hover td { background: color-mix(in srgb, var(--surface-2) 60%, var(--surface)); }
+  .sector-band {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 9px 12px; border-left: 3px solid transparent; cursor: pointer; user-select: none;
+  }
+  .sector-band .chev { font-size: 10px; color: var(--muted); transition: transform 0.15s ease; flex: none; }
+  .sector-band.open .chev { transform: rotate(90deg); }
+  .sector-band .nm { font-weight: 700; font-size: 13px; }
+  .sector-band .cnt { color: var(--muted); font-size: 11px; }
+  .sector-band .spark svg { display: block; }
+  .sector-band .avg { font-weight: 700; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .sector-band .ext { color: var(--ink-2); font-size: 11.5px; }
+  .sector-band .ext b { font-weight: 700; }
+  tr.child-row td:first-child { padding-left: 28px; }
+
   footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
 
   @media (max-width: 1080px) {
@@ -478,6 +495,36 @@
     </div>
   </div>
 
+  <!-- 1b. PRICE PERFORMANCE & OUTLOOK -->
+  <div class="section">
+    <div class="section-title"><h2>Price Performance &amp; Outlook</h2><span class="q">How did each stock travel — and which way is the trend leaning?</span></div>
+    <div class="panel">
+      <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;">
+        <p class="sub" id="perf-sub" style="margin:0;">Start → end close over the selected period · click a sector to expand its companies</p>
+        <button id="perf-expand" class="mini-btn" style="margin-left:auto;">Expand all</button>
+        <button id="perf-export" class="mini-btn">Download CSV</button>
+      </div>
+      <div class="table-wrap table-scroll" style="margin-top:10px;">
+        <table class="dtable" id="perf-table">
+          <thead><tr>
+            <th data-key="symbol">Ticker</th>
+            <th data-key="name">Company</th>
+            <th>Trend</th>
+            <th data-key="startClose" id="perf-th-start">Start</th>
+            <th data-key="endClose" id="perf-th-end">End</th>
+            <th data-key="ret">Change</th>
+            <th data-key="vol">Volatility</th>
+            <th data-key="rsi">RSI (14)</th>
+            <th data-key="high52dist">vs 52W High</th>
+            <th data-key="proj">Proj. 1M trend</th>
+          </tr></thead>
+          <tbody id="perf-tbody"></tbody>
+        </table>
+      </div>
+      <p class="sub" style="margin:10px 0 0;">Volatility is annualized over the selected period. Projection = the trailing 63-session log-price trend extrapolated 21 sessions forward (trend fit R² on hover) — a momentum read, not a forecast or investment advice.</p>
+    </div>
+  </div>
+
   <!-- 2. PERFORMANCE -->
   <div class="section">
     <div class="section-title"><h2>Performance</h2><span class="q">Which companies drove the selected period?</span></div>
@@ -538,11 +585,20 @@
 
   <!-- 7. CORRELATION -->
   <div class="section">
-    <div class="section-title"><h2>Correlation Matrix</h2><span class="q">Where are the diversification opportunities?</span></div>
-    <div class="panel">
-      <h3>Pairwise return correlation</h3><p class="sub" id="corr-window-label">Trailing 1-year daily returns</p>
-      <div class="legend" id="corr-legend"></div>
-      <div class="table-wrap" id="corr-matrix"></div>
+    <div class="section-title"><h2>Correlation</h2><span class="q">What moves together — and what actually diversifies?</span></div>
+    <div class="grid-2">
+      <div class="panel">
+        <h3>Average correlation between sectors</h3><p class="sub" id="corr-window-label">Mean pairwise correlation of daily returns · diagonal = within-sector</p>
+        <div class="legend" id="corr-legend"></div>
+        <div id="corr-matrix"></div>
+      </div>
+      <div class="panel">
+        <h3>Notable pairs</h3><p class="sub">The strongest co-movers, and the pairs that hedge each other best</p>
+        <div class="grid-2" style="gap:0 20px;">
+          <div><p class="sub" style="margin:6px 0 2px;font-weight:600;color:var(--ink-2)">Move together</p><div id="corr-top"></div></div>
+          <div><p class="sub" style="margin:6px 0 2px;font-weight:600;color:var(--ink-2)">Diversifiers</p><div id="corr-low"></div></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -556,34 +612,6 @@
   </div>
 
   <!-- 9. COMPANY TABLE -->
-  <div class="section">
-    <div class="section-title"><h2>Price Performance &amp; Outlook</h2><span class="q">How did each stock travel — and which way is the trend leaning?</span></div>
-    <div class="panel">
-      <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;">
-        <p class="sub" id="perf-sub" style="margin:0;">Start → end close over the selected period · click a row to open the company page</p>
-        <button id="perf-export" class="mini-btn" style="margin-left:auto;">Download CSV</button>
-      </div>
-      <div class="table-wrap table-scroll" style="margin-top:10px;">
-        <table class="dtable" id="perf-table">
-          <thead><tr>
-            <th data-key="symbol">Ticker</th>
-            <th data-key="name">Company</th>
-            <th>Trend</th>
-            <th data-key="startClose" id="perf-th-start">Start</th>
-            <th data-key="endClose" id="perf-th-end">End</th>
-            <th data-key="ret">Change</th>
-            <th data-key="vol">Volatility</th>
-            <th data-key="rsi">RSI (14)</th>
-            <th data-key="high52dist">vs 52W High</th>
-            <th data-key="proj">Proj. 1M trend</th>
-          </tr></thead>
-          <tbody id="perf-tbody"></tbody>
-        </table>
-      </div>
-      <p class="sub" style="margin:10px 0 0;">Volatility is annualized over the selected period. Projection = the trailing 63-session log-price trend extrapolated 21 sessions forward (trend fit R² on hover) — a momentum read, not a forecast or investment advice.</p>
-    </div>
-  </div>
-
   <div class="section">
     <div class="section-title"><h2>Company Detail Table</h2><span class="q">Which companies deserve deeper investigation?</span></div>
     <div class="panel">

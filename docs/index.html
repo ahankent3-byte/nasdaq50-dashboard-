@@ -378,6 +378,23 @@
   td.spark-cell { padding-top: 4px; padding-bottom: 4px; }
   td.spark-cell svg { display: block; }
 
+  /* Sector accordion rows */
+  tr.sector-row td { padding: 0; background: var(--surface-2); }
+  tr.sector-row:hover td { background: color-mix(in srgb, var(--surface-2) 60%, var(--surface)); }
+  .sector-band {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 9px 12px; border-left: 3px solid transparent; cursor: pointer; user-select: none;
+  }
+  .sector-band .chev { font-size: 10px; color: var(--muted); transition: transform 0.15s ease; flex: none; }
+  .sector-band.open .chev { transform: rotate(90deg); }
+  .sector-band .nm { font-weight: 700; font-size: 13px; }
+  .sector-band .cnt { color: var(--muted); font-size: 11px; }
+  .sector-band .spark svg { display: block; }
+  .sector-band .avg { font-weight: 700; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .sector-band .ext { color: var(--ink-2); font-size: 11.5px; }
+  .sector-band .ext b { font-weight: 700; }
+  tr.child-row td:first-child { padding-left: 28px; }
+
   footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
 
   @media (max-width: 1080px) {
@@ -478,6 +495,36 @@
     </div>
   </div>
 
+  <!-- 1b. PRICE PERFORMANCE & OUTLOOK -->
+  <div class="section">
+    <div class="section-title"><h2>Price Performance &amp; Outlook</h2><span class="q">How did each stock travel — and which way is the trend leaning?</span></div>
+    <div class="panel">
+      <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;">
+        <p class="sub" id="perf-sub" style="margin:0;">Start → end close over the selected period · click a sector to expand its companies</p>
+        <button id="perf-expand" class="mini-btn" style="margin-left:auto;">Expand all</button>
+        <button id="perf-export" class="mini-btn">Download CSV</button>
+      </div>
+      <div class="table-wrap table-scroll" style="margin-top:10px;">
+        <table class="dtable" id="perf-table">
+          <thead><tr>
+            <th data-key="symbol">Ticker</th>
+            <th data-key="name">Company</th>
+            <th>Trend</th>
+            <th data-key="startClose" id="perf-th-start">Start</th>
+            <th data-key="endClose" id="perf-th-end">End</th>
+            <th data-key="ret">Change</th>
+            <th data-key="vol">Volatility</th>
+            <th data-key="rsi">RSI (14)</th>
+            <th data-key="high52dist">vs 52W High</th>
+            <th data-key="proj">Proj. 1M trend</th>
+          </tr></thead>
+          <tbody id="perf-tbody"></tbody>
+        </table>
+      </div>
+      <p class="sub" style="margin:10px 0 0;">Volatility is annualized over the selected period. Projection = the trailing 63-session log-price trend extrapolated 21 sessions forward (trend fit R² on hover) — a momentum read, not a forecast or investment advice.</p>
+    </div>
+  </div>
+
   <!-- 2. PERFORMANCE -->
   <div class="section">
     <div class="section-title"><h2>Performance</h2><span class="q">Which companies drove the selected period?</span></div>
@@ -538,11 +585,20 @@
 
   <!-- 7. CORRELATION -->
   <div class="section">
-    <div class="section-title"><h2>Correlation Matrix</h2><span class="q">Where are the diversification opportunities?</span></div>
-    <div class="panel">
-      <h3>Pairwise return correlation</h3><p class="sub" id="corr-window-label">Trailing 1-year daily returns</p>
-      <div class="legend" id="corr-legend"></div>
-      <div class="table-wrap" id="corr-matrix"></div>
+    <div class="section-title"><h2>Correlation</h2><span class="q">What moves together — and what actually diversifies?</span></div>
+    <div class="grid-2">
+      <div class="panel">
+        <h3>Average correlation between sectors</h3><p class="sub" id="corr-window-label">Mean pairwise correlation of daily returns · diagonal = within-sector</p>
+        <div class="legend" id="corr-legend"></div>
+        <div id="corr-matrix"></div>
+      </div>
+      <div class="panel">
+        <h3>Notable pairs</h3><p class="sub">The strongest co-movers, and the pairs that hedge each other best</p>
+        <div class="grid-2" style="gap:0 20px;">
+          <div><p class="sub" style="margin:6px 0 2px;font-weight:600;color:var(--ink-2)">Move together</p><div id="corr-top"></div></div>
+          <div><p class="sub" style="margin:6px 0 2px;font-weight:600;color:var(--ink-2)">Diversifiers</p><div id="corr-low"></div></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -556,34 +612,6 @@
   </div>
 
   <!-- 9. COMPANY TABLE -->
-  <div class="section">
-    <div class="section-title"><h2>Price Performance &amp; Outlook</h2><span class="q">How did each stock travel — and which way is the trend leaning?</span></div>
-    <div class="panel">
-      <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;">
-        <p class="sub" id="perf-sub" style="margin:0;">Start → end close over the selected period · click a row to open the company page</p>
-        <button id="perf-export" class="mini-btn" style="margin-left:auto;">Download CSV</button>
-      </div>
-      <div class="table-wrap table-scroll" style="margin-top:10px;">
-        <table class="dtable" id="perf-table">
-          <thead><tr>
-            <th data-key="symbol">Ticker</th>
-            <th data-key="name">Company</th>
-            <th>Trend</th>
-            <th data-key="startClose" id="perf-th-start">Start</th>
-            <th data-key="endClose" id="perf-th-end">End</th>
-            <th data-key="ret">Change</th>
-            <th data-key="vol">Volatility</th>
-            <th data-key="rsi">RSI (14)</th>
-            <th data-key="high52dist">vs 52W High</th>
-            <th data-key="proj">Proj. 1M trend</th>
-          </tr></thead>
-          <tbody id="perf-tbody"></tbody>
-        </table>
-      </div>
-      <p class="sub" style="margin:10px 0 0;">Volatility is annualized over the selected period. Projection = the trailing 63-session log-price trend extrapolated 21 sessions forward (trend fit R² on hover) — a momentum read, not a forecast or investment advice.</p>
-    </div>
-  </div>
-
   <div class="section">
     <div class="section-title"><h2>Company Detail Table</h2><span class="q">Which companies deserve deeper investigation?</span></div>
     <div class="panel">
@@ -1492,7 +1520,7 @@ function computePeriod() {
   const riskLabelEl = document.getElementById("risk-window-label");
   if (riskLabelEl) riskLabelEl.textContent = riskWindowText;
   const corrLabelEl = document.getElementById("corr-window-label");
-  if (corrLabelEl) corrLabelEl.textContent = riskSessions + " daily returns ending " + fmtDate(DATA.dates[rEnd]);
+  if (corrLabelEl) corrLabelEl.textContent = "Mean pairwise correlation · " + riskSessions + " daily returns ending " + fmtDate(DATA.dates[rEnd]) + " · diagonal = within-sector";
 }
 
 /* ---------------- legends ---------------- */
@@ -1857,39 +1885,105 @@ function renderTradingActivity(filtered) {
 }
 
 /* ---------------- correlation matrix ---------------- */
+const SECTOR_ABBR = {
+  "Technology": "Tech", "Consumer Cyclical": "Cons Cyc", "Communication Services": "Comm Svc",
+  "Healthcare": "Health", "Consumer Defensive": "Cons Def", "Industrials": "Indust",
+  "Financial Services": "Fin Svc",
+};
 function renderCorrelation(filtered) {
   buildCorrLegend(document.getElementById("corr-legend"));
-  const n = filtered.length;
   const container = document.getElementById("corr-matrix");
-  container.innerHTML = "";
-  if (n < 2) { container.innerHTML = '<p style="color:var(--muted);font-size:12.5px;">Select at least two companies to compare.</p>'; return; }
-  const cell = Math.max(9, Math.min(16, 680/n));
-  const labelSpace = 62;
-  const W = labelSpace + n*cell, H = labelSpace + n*cell;
-  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, style: `width:${Math.max(600,W)}px` });
+  const topEl = document.getElementById("corr-top"), lowEl = document.getElementById("corr-low");
+  container.innerHTML = ""; topEl.innerHTML = ""; lowEl.innerHTML = "";
+  if (filtered.length < 2) {
+    container.innerHTML = '<p style="color:var(--muted);font-size:12.5px;">Select at least two companies to compare.</p>';
+    return;
+  }
   const rets = {}; filtered.forEach(t => rets[t] = PERIOD.metrics[t].retSlice);
-  filtered.forEach((rt, ri) => {
-    const rowLbl = el("text", { class: "axis-label", x: labelSpace-4, y: labelSpace+ri*cell+cell*0.72, "text-anchor": "end", style: "font-size:8px" });
-    rowLbl.textContent = rt; svg.appendChild(rowLbl);
-    const colLbl = el("text", { class: "axis-label", x: labelSpace+ri*cell+cell*0.5, y: labelSpace-6, "text-anchor": "start",
-      transform: `rotate(-60 ${labelSpace+ri*cell+cell*0.5} ${labelSpace-6})`, style: "font-size:8px" });
-    colLbl.textContent = rt; svg.appendChild(colLbl);
-    filtered.forEach((ct, ci) => {
-      const corr = ri === ci ? 1 : correlation(rets[rt], rets[ct]);
-      const x = labelSpace + ci*cell, y = labelSpace + ri*cell;
-      const rect = el("rect", { x, y, width: cell-1, height: cell-1, fill: divergingColor(corr,1) });
-      rect.addEventListener("pointerenter", () => {
-        const r = rect.getBoundingClientRect();
-        const box = document.createElement("div");
-        box.appendChild(ttHead(`${rt} (${DATA.stocks[rt].name}) × ${ct} (${DATA.stocks[ct].name})`));
-        box.appendChild(ttRow(divergingColor(corr,1), "Correlation", corr.toFixed(2)));
-        showTooltip(r.left+r.width/2, r.top, box);
-      });
-      rect.addEventListener("pointerleave", hideTooltip);
+  const secOf = (t) => DATA.stocks[t].sector;
+
+  // all pairwise correlations once — feeds both the sector matrix and the pair lists
+  const pairs = [];
+  for (let i = 0; i < filtered.length; i++) for (let j = i+1; j < filtered.length; j++) {
+    const a = filtered[i], b = filtered[j];
+    const c = correlation(rets[a], rets[b]);
+    if (isFinite(c)) pairs.push({ a, b, c });
+  }
+
+  /* --- sector × sector heatmap --- */
+  const secs = [...new Set(filtered.map(secOf))].sort((x, y) => {
+    const ix = TOP_SECTORS.indexOf(x), iy = TOP_SECTORS.indexOf(y);
+    return (ix < 0 ? 99 : ix) - (iy < 0 ? 99 : iy) || x.localeCompare(y);
+  });
+  const agg = {};
+  pairs.forEach(p => {
+    const key = [secOf(p.a), secOf(p.b)].sort().join("|");
+    (agg[key] = agg[key] || { sum: 0, n: 0 });
+    agg[key].sum += p.c; agg[key].n++;
+  });
+  const avgCorr = (sa, sb) => {
+    const e = agg[[sa, sb].sort().join("|")];
+    return e ? { v: e.sum / e.n, n: e.n } : null;
+  };
+
+  const m = secs.length, labelSpace = 76, topSpace = 22;
+  const cell = Math.min(52, Math.max(34, 380/m));
+  const W = labelSpace + m*cell + 8, H = topSpace + m*cell + 6;
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}` });
+  secs.forEach((sec, i) => {
+    const abbr = SECTOR_ABBR[sec] || sec.slice(0, 8);
+    const colLbl = el("text", { class: "axis-label", x: labelSpace + i*cell + cell/2, y: topSpace - 8, "text-anchor": "middle", style: "font-size:9px;font-weight:600" });
+    colLbl.textContent = abbr; svg.appendChild(colLbl);
+    const rowLbl = el("text", { class: "axis-label", x: labelSpace - 6, y: topSpace + i*cell + cell/2 + 3, "text-anchor": "end", style: "font-size:9px;font-weight:600" });
+    rowLbl.textContent = abbr; svg.appendChild(rowLbl);
+  });
+  secs.forEach((rowSec, ri) => {
+    secs.forEach((colSec, ci) => {
+      if (ci < ri) return;   // upper triangle only — the mirror half is pure repetition
+      const e = avgCorr(rowSec, colSec);
+      const x = labelSpace + ci*cell, y = topSpace + ri*cell;
+      const fill = e ? divergingColor(e.v, 1) : cssVar("--surface-2");
+      const rect = el("rect", { x, y, width: cell-2, height: cell-2, rx: 3, fill });
       svg.appendChild(rect);
+      const txt = el("text", { x: x + (cell-2)/2, y: y + (cell-2)/2 + 3.5, "text-anchor": "middle",
+        fill: e ? textColorFor(fill) : cssVar("--muted"), style: "font-size:10.5px;font-weight:600" });
+      txt.textContent = e ? e.v.toFixed(2) : "—";
+      svg.appendChild(txt);
+      const hit = el("rect", { x, y, width: cell-2, height: cell-2, fill: "transparent" });
+      hit.addEventListener("pointerenter", () => {
+        const r = hit.getBoundingClientRect();
+        const box = document.createElement("div");
+        box.appendChild(ttHead(rowSec === colSec ? rowSec + " — within sector" : rowSec + " × " + colSec));
+        if (e) {
+          box.appendChild(ttRow(fill, "Avg correlation", e.v.toFixed(2)));
+          box.appendChild(ttRow(cssVar("--muted"), "Stock pairs", e.n));
+        } else {
+          box.appendChild(ttRow(cssVar("--muted"), "Stock pairs", "not enough companies"));
+        }
+        showTooltip(r.left + r.width/2, r.top, box);
+      });
+      hit.addEventListener("pointerleave", hideTooltip);
+      svg.appendChild(hit);
     });
   });
   container.appendChild(svg);
+
+  /* --- notable pairs --- */
+  pairs.sort((x, y) => y.c - x.c);
+  const pairRow = (p) => {
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12.5px;";
+    row.title = DATA.stocks[p.a].name + " × " + DATA.stocks[p.b].name;
+    const names = document.createElement("span");
+    names.innerHTML = `<b>${p.a}</b> <span style="color:var(--muted)">×</span> <b>${p.b}</b>`;
+    const val = document.createElement("span");
+    val.style.cssText = "font-weight:700;font-variant-numeric:tabular-nums;display:inline-flex;align-items:center;gap:6px;";
+    val.innerHTML = `<span style="width:9px;height:9px;border-radius:2px;background:${divergingColor(p.c,1)};display:inline-block"></span>${p.c.toFixed(2)}`;
+    row.append(names, val);
+    return row;
+  };
+  pairs.slice(0, 6).forEach(p => topEl.appendChild(pairRow(p)));
+  [...pairs].reverse().slice(0, 6).forEach(p => lowEl.appendChild(pairRow(p)));
 }
 
 /* ---------------- returns histogram + CAGR/vol scatter ---------------- */
@@ -2206,7 +2300,7 @@ function buildPerfRows(filtered) {
     const s = DATA.stocks[t], p = PERIOD.metrics[t], m = M[t];
     const proj = trendProjection(t);
     return {
-      symbol: t, name: s.name, closes: s.close.slice(startIdx, endIdx+1),
+      symbol: t, name: s.name, sector: s.sector, closes: s.close.slice(startIdx, endIdx+1),
       startClose: s.close[startIdx], endClose: s.close[endIdx],
       ret: p.periodReturn, vol: isFinite(p.vol) ? p.vol : null,
       rsi: latestRsi(t), high52dist: m.high52dist,
@@ -2224,30 +2318,90 @@ function sortedPerfRows(filtered) {
   });
   return rows;
 }
+const perfExpanded = new Set();
 function renderPerfTable(filtered) {
   document.getElementById("perf-th-start").textContent = fmtDate(DATA.dates[PERIOD.startIdx]);
   document.getElementById("perf-th-end").textContent = fmtDate(DATA.dates[PERIOD.endIdx]);
   document.getElementById("perf-sub").textContent =
     (state.period === "1D" ? "Previous close → latest close" : "Start → end close over the selected period")
-    + " · click a row to open the company page";
+    + " · click a sector to expand its companies";
   const rows = sortedPerfRows(filtered);
   const tbody = document.getElementById("perf-tbody");
   tbody.innerHTML = "";
-  rows.forEach(r => {
-    const tr = document.createElement("tr");
-    const rsiChip = r.rsi >= 70 ? '<span class="rsi-chip hot">overbought</span>'
-                  : r.rsi <= 30 ? '<span class="rsi-chip cold">oversold</span>' : "";
-    tr.innerHTML = `<td style="font-weight:700">${r.symbol}</td><td style="color:var(--ink-2)">${r.name}</td>
-      <td class="spark-cell">${sparkCell(r.closes, r.ret >= 0)}</td>
-      <td>${fmtUsd(r.startClose)}</td><td>${fmtUsd(r.endClose)}</td>
-      <td class="${r.ret>=0?'pos':'neg'}">${fmtPct(r.ret)}</td>
-      <td>${r.vol != null ? r.vol.toFixed(1)+"%" : "—"}</td>
-      <td>${r.rsi != null ? Math.round(r.rsi) : "—"}${rsiChip}</td>
-      <td class="${r.high52dist>=-1?'pos':'neg'}">${fmtPct(r.high52dist,1)}</td>
-      <td class="${r.proj>=0?'pos':'neg'}" title="Trend fit R² = ${r.projR2 != null ? r.projR2.toFixed(2) : "—"} · naive extrapolation, not a forecast">${r.proj != null ? fmtPct(r.proj,1) : "—"}</td>`;
-    tr.addEventListener("click", () => selectTicker(r.symbol));
-    tbody.appendChild(tr);
+
+  // group the sorted rows by sector (rows stay in sort order within their group)
+  const groups = new Map();
+  rows.forEach(r => { if (!groups.has(r.sector)) groups.set(r.sector, []); groups.get(r.sector).push(r); });
+  const { startIdx, endIdx } = PERIOD;
+  const glist = [...groups.entries()].map(([sector, list]) => {
+    const avg = mean(list.map(r => r.ret));
+    const finiteKey = list.map(r => r[perfSort.key]).filter(v => typeof v === "number" && isFinite(v));
+    return {
+      sector, list, avg,
+      best: list.reduce((a,b) => a.ret > b.ret ? a : b),
+      worst: list.reduce((a,b) => a.ret < b.ret ? a : b),
+      hot: list.filter(r => r.rsi >= 70).length,
+      cold: list.filter(r => r.rsi <= 30).length,
+      sortKey: finiteKey.length ? mean(finiteKey) : null,
+    };
   });
+  // order sector bands by the active sort column's group average; fall back to avg return
+  glist.sort((a,b) => {
+    if (a.sortKey != null && b.sortKey != null)
+      return perfSort.dir === "asc" ? a.sortKey - b.sortKey : b.sortKey - a.sortKey;
+    return b.avg - a.avg;
+  });
+
+  const singleGroup = glist.length === 1;
+  glist.forEach(g => {
+    const open = singleGroup || perfExpanded.has(g.sector);
+    const idx = g.list.map(r => r.symbol);
+    const sectorSpark = DATA.dates.slice(startIdx, endIdx + 1)
+      .map((_, i) => mean(idx.map(t => DATA.stocks[t].close[startIdx + i] / DATA.stocks[t].close[startIdx])));
+
+    const tr = document.createElement("tr");
+    tr.className = "sector-row";
+    const td = document.createElement("td");
+    td.colSpan = 10;
+    td.innerHTML = `<div class="sector-band${open ? " open" : ""}" style="border-left-color:${sectorColor(g.sector)}">
+      <span class="chev">▶</span>
+      <span class="nm">${g.sector}</span>
+      <span class="cnt">${g.list.length} ${g.list.length === 1 ? "company" : "companies"}</span>
+      <span class="spark">${sparkCell(sectorSpark, g.avg >= 0)}</span>
+      <span class="avg ${g.avg >= 0 ? "pos" : "neg"}">${fmtPct(g.avg)}</span>
+      <span class="ext">best <b>${g.best.symbol}</b> ${fmtPct(g.best.ret)}${g.list.length > 1 ? ` · worst <b>${g.worst.symbol}</b> ${fmtPct(g.worst.ret)}` : ""}</span>
+      ${g.hot ? `<span class="rsi-chip hot">${g.hot} overbought</span>` : ""}
+      ${g.cold ? `<span class="rsi-chip cold">${g.cold} oversold</span>` : ""}
+    </div>`;
+    td.addEventListener("click", () => {
+      if (singleGroup) return;
+      if (open) perfExpanded.delete(g.sector); else perfExpanded.add(g.sector);
+      renderPerfTable(getFiltered());
+    });
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+
+    if (!open) return;
+    g.list.forEach(r => {
+      const ctr = document.createElement("tr");
+      ctr.className = "child-row";
+      const rsiChip = r.rsi >= 70 ? '<span class="rsi-chip hot">overbought</span>'
+                    : r.rsi <= 30 ? '<span class="rsi-chip cold">oversold</span>' : "";
+      ctr.innerHTML = `<td style="font-weight:700">${r.symbol}</td><td style="color:var(--ink-2)">${r.name}</td>
+        <td class="spark-cell">${sparkCell(r.closes, r.ret >= 0)}</td>
+        <td>${fmtUsd(r.startClose)}</td><td>${fmtUsd(r.endClose)}</td>
+        <td class="${r.ret>=0?'pos':'neg'}">${fmtPct(r.ret)}</td>
+        <td>${r.vol != null ? r.vol.toFixed(1)+"%" : "—"}</td>
+        <td>${r.rsi != null ? Math.round(r.rsi) : "—"}${rsiChip}</td>
+        <td class="${r.high52dist>=-1?'pos':'neg'}">${fmtPct(r.high52dist,1)}</td>
+        <td class="${r.proj>=0?'pos':'neg'}" title="Trend fit R² = ${r.projR2 != null ? r.projR2.toFixed(2) : "—"} · naive extrapolation, not a forecast">${r.proj != null ? fmtPct(r.proj,1) : "—"}</td>`;
+      ctr.addEventListener("click", () => selectTicker(r.symbol));
+      tbody.appendChild(ctr);
+    });
+  });
+
+  const allExpanded = glist.every(g => singleGroup || perfExpanded.has(g.sector));
+  document.getElementById("perf-expand").textContent = allExpanded ? "Collapse all" : "Expand all";
   document.querySelectorAll("#perf-table th").forEach(th => {
     th.classList.toggle("sorted", th.dataset.key === perfSort.key);
     th.dataset.dir = perfSort.dir === "asc" ? "▲" : "▼";
@@ -2258,8 +2412,8 @@ function exportPerfCSV() {
   const esc = (v) => { const s = String(v ?? ""); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
   const startD = DATA.dates[PERIOD.startIdx], endD = DATA.dates[PERIOD.endIdx];
   const lines = [
-    ["Ticker","Company",`Close ${startD}`,`Close ${endD}`,"Change %","Volatility % (ann.)","RSI 14","Vs 52W High %","Projected 1M trend %","Trend R2"].join(","),
-    ...rows.map(r => [r.symbol, esc(r.name), r.startClose, r.endClose,
+    ["Ticker","Company","Sector",`Close ${startD}`,`Close ${endD}`,"Change %","Volatility % (ann.)","RSI 14","Vs 52W High %","Projected 1M trend %","Trend R2"].join(","),
+    ...rows.map(r => [r.symbol, esc(r.name), esc(r.sector), r.startClose, r.endClose,
       r.ret.toFixed(2), r.vol != null ? r.vol.toFixed(1) : "", r.rsi != null ? r.rsi.toFixed(0) : "",
       r.high52dist != null ? r.high52dist.toFixed(1) : "", r.proj != null ? r.proj.toFixed(1) : "",
       r.projR2 != null ? r.projR2.toFixed(2) : ""].join(",")),
@@ -2345,6 +2499,12 @@ function wireEvents() {
     renderPerfTable(getFiltered());
   }));
   document.getElementById("perf-export").addEventListener("click", exportPerfCSV);
+  document.getElementById("perf-expand").addEventListener("click", () => {
+    const secs = [...new Set(getFiltered().map(t => DATA.stocks[t].sector))];
+    if (secs.every(s => perfExpanded.has(s))) perfExpanded.clear();
+    else secs.forEach(s => perfExpanded.add(s));
+    renderPerfTable(getFiltered());
+  });
   document.getElementById("period-toggle").addEventListener("click", (e) => {
     if (e.target.tagName !== "BUTTON") return;
     document.querySelectorAll("#period-toggle button").forEach(b => b.classList.remove("active"));
