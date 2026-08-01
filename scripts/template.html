@@ -481,8 +481,13 @@
   <div class="section">
     <div class="section-title"><h2>Sector Analysis</h2><span class="q">Which sector is strongest — and weakest?</span></div>
     <div class="grid-2">
-      <div class="panel"><h3>Average daily return by sector</h3><p class="sub">Equal-weighted mean of constituent returns</p><div id="sector-bar"></div></div>
-      <div class="panel"><h3>Sector allocation</h3><p class="sub">Share of total market cap</p><div class="legend" id="sector-tm-legend"></div><div id="sector-treemap"></div></div>
+      <div class="panel"><h3>Return by sector</h3><p class="sub" id="sector-bar-sub">Equal-weighted mean of constituent returns · click a bar to filter the dashboard</p><div id="sector-bar"></div></div>
+      <div class="panel"><h3>Sector allocation</h3><p class="sub">Share of total market cap · click a tile to filter the dashboard</p><div class="legend" id="sector-tm-legend"></div><div id="sector-treemap"></div></div>
+    </div>
+    <div class="panel" style="margin-top:12px;">
+      <h3>Sector performance over the period</h3><p class="sub" id="sector-idx-sub">Equal-weight index of each sector's constituents · period start = 100</p>
+      <div class="legend" id="sector-idx-legend"></div>
+      <div id="sector-index"></div>
     </div>
   </div>
 
@@ -1160,27 +1165,43 @@ function renderTreemap(container, items, opts={}) {
   const layout = [];
   squarify(sorted, 0, 0, W, H, layout);
   const svg = el("svg", { viewBox: `0 0 ${W} ${H}` });
+  // Fit text to the cell: full label if it fits, ellipsized if close, none if tiny
+  // (the tooltip always carries the full name). ~6.3px/char at the 10px label size.
+  const fitText = (text, availW, charW) => {
+    const maxChars = Math.floor(availW / charW);
+    if (text.length <= maxChars) return text;
+    if (maxChars < 4) return null;
+    return text.slice(0, maxChars - 1).trimEnd() + "…";
+  };
   layout.forEach(cell => {
     const g = el("g", { class: "tm-cell" });
+    if (cell.item.onClick) g.setAttribute("style", "cursor:pointer");
     const rect = el("rect", { x: cell.x, y: cell.y, width: Math.max(0,cell.w), height: Math.max(0,cell.h), fill: cell.item.color, rx: 3 });
     g.appendChild(rect);
     if (cell.w > 34 && cell.h > 20) {
       const textColor = cell.item.textColor || textColorFor(cell.item.color);
-      const lbl = el("text", { x: cell.x+6, y: cell.y+16, fill: textColor }); lbl.textContent = cell.item.label;
-      g.appendChild(lbl);
+      const label = fitText(cell.item.label, cell.w - 12, 6.3);
+      if (label) {
+        const lbl = el("text", { x: cell.x+6, y: cell.y+16, fill: textColor }); lbl.textContent = label;
+        g.appendChild(lbl);
+      }
       if (cell.item.sub && cell.h > 34) {
-        const sub = el("text", { x: cell.x+6, y: cell.y+28, fill: textColor, class: "tm-sub", opacity: 0.85 }); sub.textContent = cell.item.sub;
-        g.appendChild(sub);
+        const sub = fitText(cell.item.sub, cell.w - 12, 5.4);
+        if (sub) {
+          const subEl = el("text", { x: cell.x+6, y: cell.y+28, fill: textColor, class: "tm-sub", opacity: 0.85 }); subEl.textContent = sub;
+          g.appendChild(subEl);
+        }
       }
     }
     g.addEventListener("pointerenter", () => {
+      rect.setAttribute("opacity", 0.85);
       const r = rect.getBoundingClientRect();
       const box = document.createElement("div");
       box.appendChild(ttHead(cell.item.label));
       if (cell.item.tooltip) cell.item.tooltip.forEach(row => box.appendChild(ttRow(row.color, row.name, row.value)));
       showTooltip(r.left+r.width/2, r.top, box);
     });
-    g.addEventListener("pointerleave", hideTooltip);
+    g.addEventListener("pointerleave", () => { rect.setAttribute("opacity", 1); hideTooltip(); });
     if (cell.item.onClick) g.addEventListener("click", cell.item.onClick);
     svg.appendChild(g);
   });

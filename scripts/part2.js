@@ -198,61 +198,144 @@ function renderHeatmapSection(filtered) {
 }
 
 /* ---------------- sector analysis ---------------- */
+function setSectorFilter(sector) {
+  const next = state.sector === sector ? "All" : sector;
+  state.sector = next;
+  document.getElementById("f-sector").value = next;
+  renderAll();
+}
 function renderSectorReturnBars(container, rows) {
   container.innerHTML = "";
-  const W = 460, H = 240, padL = 34, padR = 10, padT = 10, padB = 62;
-  const innerW = W - padL - padR, innerH = H - padT - padB;
-  const maxAbs = Math.max(0.5, ...rows.map(r => Math.abs(r.value)));
-  const yScale = (v) => padT + innerH/2 - (v/maxAbs) * (innerH/2);
-  const bw = innerW / rows.length - 8;
+  const W = 560, rowH = 34, labelW = 170, padT = 8, padB = 24, padR = 50;
+  const H = padT + rows.length*rowH + padB;
+  const innerW = W - labelW - padR;
+  const minV = Math.min(0, ...rows.map(r => r.value));
+  const maxV = Math.max(0, ...rows.map(r => r.value));
+  const span = (maxV - minV) || 1;
+  const xScale = (v) => labelW + ((v - minV)/span)*innerW;
+  const zeroX = xScale(0);
   const svg = el("svg", { viewBox: `0 0 ${W} ${H}` });
-  [maxAbs, 0, -maxAbs].forEach(v => {
-    const y = yScale(v);
-    svg.appendChild(el("line", { class: v===0?"baseline-line":"gridline", x1: padL, x2: W-padR, y1: y, y2: y }));
-    const t = el("text", { class: "axis-label", x: padL-5, y: y+3, "text-anchor": "end" }); t.textContent = v.toFixed(1)+"%";
+
+  const step = [0.25, 0.5, 1, 2, 3, 5, 10, 20, 50].find(s => span/s <= 6) || 100;
+  for (let v = Math.ceil(minV/step - 1e-9)*step; v <= maxV + 1e-9; v += step) {
+    const x = xScale(v);
+    svg.appendChild(el("line", { class: Math.abs(v) < 1e-9 ? "baseline-line" : "gridline", x1: x, x2: x, y1: padT, y2: H-padB }));
+    const t = el("text", { class: "axis-label", x, y: H-padB+13, "text-anchor": "middle" });
+    t.textContent = (v > 0 ? "+" : "") + v.toFixed(step < 1 ? 1 : 0) + "%";
     svg.appendChild(t);
-  });
+  }
+
   rows.forEach((r, i) => {
-    const cx = padL + innerW * ((i+0.5)/rows.length);
+    const yTop = padT + i*rowH, barH = 16, y = yTop + (rowH - barH)/2;
     const isUp = r.value >= 0;
-    const y0 = yScale(0), y1 = yScale(r.value);
-    const top = Math.min(y0,y1), h = Math.max(1, Math.abs(y1-y0));
-    const x = cx - bw/2, rad = Math.min(4, h);
+    const xEnd = xScale(r.value);
+    const x0 = Math.min(zeroX, xEnd), w = Math.max(1.5, Math.abs(xEnd - zeroX));
+    const rad = Math.min(4, w);
+    // rounded on the outer end only, anchored flat at the zero baseline
     const d = isUp
-      ? `M${x},${top+h} L${x},${top+rad} Q${x},${top} ${x+rad},${top} L${x+bw-rad},${top} Q${x+bw},${top} ${x+bw},${top+rad} L${x+bw},${top+h} Z`
-      : `M${x},${top} L${x+bw},${top} L${x+bw},${top+h-rad} Q${x+bw},${top+h} ${x+bw-rad},${top+h} L${x+rad},${top+h} Q${x},${top+h} ${x},${top+h-rad} Z`;
-    svg.appendChild(el("path", { d, class: "bar-visual " + (isUp?"bar-up":"bar-down") }));
-    const label = el("text", { class: "axis-label", x: cx, y: H-padB+14, "text-anchor": "end", transform: `rotate(-35 ${cx} ${H-padB+14})` });
-    label.textContent = r.sector; svg.appendChild(label);
-    const hit = el("rect", { class: "bar-hit", x: x-3, y: padT, width: bw+6, height: innerH });
+      ? `M${x0},${y} L${x0+w-rad},${y} Q${x0+w},${y} ${x0+w},${y+rad} L${x0+w},${y+barH-rad} Q${x0+w},${y+barH} ${x0+w-rad},${y+barH} L${x0},${y+barH} Z`
+      : `M${x0+w},${y} L${x0+rad},${y} Q${x0},${y} ${x0},${y+rad} L${x0},${y+barH-rad} Q${x0},${y+barH} ${x0+rad},${y+barH} L${x0+w},${y+barH} Z`;
+
+    const name = el("text", { x: labelW - 10, y: yTop + rowH/2 + 1, "text-anchor": "end", fill: cssVar("--ink-2"), style: "font-size:12px" });
+    name.textContent = r.sector;
+    const cnt = el("tspan", { fill: cssVar("--muted"), style: "font-size:10px" });
+    cnt.textContent = "  " + r.count;
+    name.appendChild(cnt);
+    svg.appendChild(name);
+
+    const hit = el("rect", { class: "bar-hit", x: 0, y: yTop, width: W, height: rowH });
+    const bar = el("path", { d, class: "bar-visual " + (isUp ? "bar-up" : "bar-down") });
+
+    const val = el("text", { x: isUp ? xEnd + 5 : xEnd - 5, y: yTop + rowH/2 + 4, "text-anchor": isUp ? "start" : "end",
+      fill: cssVar(isUp ? "--good" : "--critical"), style: "font-size:11px;font-weight:700;font-variant-numeric:tabular-nums" });
+    val.textContent = fmtPct(r.value);
+
     hit.addEventListener("pointerenter", () => {
       const rect = hit.getBoundingClientRect();
       const box = document.createElement("div");
       box.appendChild(ttHead(r.sector));
-      box.appendChild(ttRow(isUp?cssVar("--good"):cssVar("--critical"), "Avg return", fmtPct(r.value)));
-      showTooltip(rect.left+rect.width/2, rect.top, box);
+      box.appendChild(ttRow(cssVar(isUp ? "--good" : "--critical"), "Avg return", fmtPct(r.value)));
+      box.appendChild(ttRow(cssVar("--muted"), "Companies", r.count));
+      if (r.best) box.appendChild(ttRow(cssVar("--good"), "Best — " + r.best.t, fmtPct(r.best.ret)));
+      if (r.worst && r.count > 1) box.appendChild(ttRow(cssVar("--critical"), "Worst — " + r.worst.t, fmtPct(r.worst.ret)));
+      showTooltip(rect.left + rect.width/2, rect.top, box);
     });
     hit.addEventListener("pointerleave", hideTooltip);
+    hit.addEventListener("click", () => setSectorFilter(r.sector));
     svg.appendChild(hit);
+    svg.appendChild(bar);
+    svg.appendChild(val);
   });
   container.appendChild(svg);
+}
+function renderSectorIndex(bySector) {
+  const container = document.getElementById("sector-index");
+  const { startIdx, endIdx } = PERIOD;
+  if (endIdx - startIdx < 1) { container.innerHTML = ""; return; }
+  const dates = DATA.dates.slice(startIdx, endIdx + 1);
+  // group non-headline sectors into "Other" so gray never means two different things
+  const groups = {};
+  Object.entries(bySector).forEach(([sec, ts]) => {
+    const key = TOP_SECTORS.includes(sec) ? sec : "Other";
+    (groups[key] = groups[key] || []).push(...ts);
+  });
+  const series = Object.entries(groups).map(([name, ts]) => ({
+    name,
+    color: sectorColor(name),
+    values: dates.map((_, i) => mean(ts.map(t => { const c = DATA.stocks[t].close; return c[startIdx + i] / c[startIdx] * 100; }))),
+  })).sort((a, b) => b.values[b.values.length-1] - a.values[a.values.length-1]);
+  buildSectorLegend(document.getElementById("sector-idx-legend"));
+  renderLineChart(container, dates, series, {
+    w: 1180, h: 260,
+    yfmt: (v) => v.toFixed(0),
+    vfmt: (v) => v.toFixed(1),
+    refLines: [{ v: 100, color: cssVar("--baseline") }],
+  });
 }
 function renderSectorSection(filtered) {
   const bySector = {};
   filtered.forEach(t => { const sec = DATA.stocks[t].sector; (bySector[sec] = bySector[sec] || []).push(t); });
-  const rows = Object.entries(bySector).map(([sector, ts]) => ({ sector, value: mean(ts.map(t => PERIOD.metrics[t].periodReturn)) }))
-    .sort((a,b) => b.value - a.value);
+  const isSingleDay = state.period === "1D";
+  document.getElementById("sector-bar-sub").textContent =
+    (isSingleDay ? "Equal-weighted mean of today's constituent returns" : "Equal-weighted mean of constituent returns over the selected period")
+    + " · click a bar to filter the dashboard";
+  document.getElementById("sector-idx-sub").textContent = isSingleDay
+    ? "Equal-weight index of each sector's constituents · previous close = 100"
+    : "Equal-weight index of each sector's constituents · period start = 100";
+
+  const rows = Object.entries(bySector).map(([sector, ts]) => {
+    const rets = ts.map(t => ({ t, ret: PERIOD.metrics[t].periodReturn })).sort((a, b) => b.ret - a.ret);
+    return { sector, value: mean(rets.map(r => r.ret)), count: ts.length, best: rets[0], worst: rets[rets.length-1] };
+  }).sort((a,b) => b.value - a.value);
   if (rows.length) renderSectorReturnBars(document.getElementById("sector-bar"), rows);
   else document.getElementById("sector-bar").innerHTML = '<p style="color:var(--muted);font-size:12.5px;">No data.</p>';
 
   buildSectorLegend(document.getElementById("sector-tm-legend"));
-  const totalCap = filtered.reduce((a,t) => a + DATA.stocks[t].marketCap, 0);
+  const withCap = filtered.filter(t => DATA.stocks[t].marketCap > 0);
+  const totalCap = withCap.reduce((a,t) => a + DATA.stocks[t].marketCap, 0);
   const capItems = Object.entries(bySector).map(([sector, ts]) => {
-    const sum = ts.reduce((a,t) => a + DATA.stocks[t].marketCap, 0);
-    return { value: sum, color: sectorColor(sector), label: sector, sub: fmtCompact(sum) + " · " + (sum/totalCap*100).toFixed(1) + "%" };
-  });
+    const inSector = ts.filter(t => DATA.stocks[t].marketCap > 0);
+    const sum = inSector.reduce((a,t) => a + DATA.stocks[t].marketCap, 0);
+    if (!sum) return null;
+    const avgRet = mean(ts.map(t => PERIOD.metrics[t].periodReturn));
+    const top = inSector.sort((a,b) => DATA.stocks[b].marketCap - DATA.stocks[a].marketCap)[0];
+    return {
+      value: sum, color: sectorColor(sector), label: sector,
+      sub: fmtCompact(sum) + " · " + (sum/totalCap*100).toFixed(1) + "%",
+      tooltip: [
+        { color: sectorColor(sector), name: "Market cap", value: fmtCompact(sum) + " (" + (sum/totalCap*100).toFixed(1) + "%)" },
+        { color: cssVar("--muted"), name: "Companies", value: ts.length },
+        { color: cssVar(avgRet >= 0 ? "--good" : "--critical"), name: "Avg return", value: fmtPct(avgRet) },
+        { color: cssVar("--muted"), name: "Largest", value: top + " · " + fmtCompact(DATA.stocks[top].marketCap) },
+      ],
+      onClick: () => setSectorFilter(sector),
+    };
+  }).filter(Boolean);
   if (capItems.length) renderTreemap(document.getElementById("sector-treemap"), capItems, { w: 560, h: 260 });
   else document.getElementById("sector-treemap").innerHTML = "";
+
+  if (Object.keys(bySector).length) renderSectorIndex(bySector);
+  else document.getElementById("sector-index").innerHTML = "";
 }
 
 /* ---------------- risk analysis ---------------- */
