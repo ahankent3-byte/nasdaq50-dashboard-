@@ -1577,7 +1577,7 @@ function setSectorFilter(sector) {
 }
 function renderSectorReturnBars(container, rows) {
   container.innerHTML = "";
-  const W = 560, rowH = 34, labelW = 170, padT = 8, padB = 24, padR = 50;
+  const W = 560, rowH = 34, labelW = 170, padT = 8, padB = 24, padR = 64;
   const H = padT + rows.length*rowH + padB;
   const innerW = W - labelW - padR;
   const minV = Math.min(0, ...rows.map(r => r.value));
@@ -1617,7 +1617,9 @@ function renderSectorReturnBars(container, rows) {
     const hit = el("rect", { class: "bar-hit", x: 0, y: yTop, width: W, height: rowH });
     const bar = el("path", { d, class: "bar-visual " + (isUp ? "bar-up" : "bar-down") });
 
-    const val = el("text", { x: isUp ? xEnd + 5 : xEnd - 5, y: yTop + rowH/2 + 4, "text-anchor": isUp ? "start" : "end",
+    // up bars: label past the bar tip; down bars: label in the clear space right
+    // of the zero baseline, so it can never collide with the sector names
+    const val = el("text", { x: (isUp ? xEnd : zeroX) + 5, y: yTop + rowH/2 + 4, "text-anchor": "start",
       fill: cssVar(isUp ? "--good" : "--critical"), style: "font-size:11px;font-weight:700;font-variant-numeric:tabular-nums" });
     val.textContent = fmtPct(r.value);
 
