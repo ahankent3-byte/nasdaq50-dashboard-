@@ -281,10 +281,14 @@ function renderRollingVol() {
 /* ---------------- valuation scatter ---------------- */
 function renderValuation(filtered) {
   buildSectorLegend(document.getElementById("scatter-legend"));
-  const pts = filtered.filter(t => DATA.stocks[t].trailingPE != null).map(t => {
+  const withPE = filtered.filter(t => DATA.stocks[t].trailingPE != null);
+  const usable = withPE.filter(t => DATA.stocks[t].marketCap > 0);
+  const omitted = withPE.filter(t => !(DATA.stocks[t].marketCap > 0));
+  const pts = usable.map(t => {
     const s = DATA.stocks[t], p = PERIOD.metrics[t];
     return {
-      x: s.marketCap, y: s.trailingPE, size: Math.max(p.periodDollarVolume, 1), color: sectorColor(s.sector), label: `${t} — ${s.name}`,
+      ticker: t, x: s.marketCap, y: s.trailingPE, size: Math.max(p.periodDollarVolume, 1),
+      color: sectorColor(s.sector), label: `${t} — ${s.name}`,
       tooltip: [
         { color: sectorColor(s.sector), name: "Sector", value: s.sector },
         { color: cssVar("--muted"), name: "P/E ratio", value: s.trailingPE.toFixed(1) },
@@ -294,8 +298,34 @@ function renderValuation(filtered) {
       onClick: () => selectTicker(t),
     };
   });
-  if (pts.length) scatterChart(document.getElementById("valuation-scatter"), pts, { w: 1180, h: 380, xLog: true, xfmt: (v) => fmtCompact(v), yfmt: (v) => v.toFixed(0) });
-  else document.getElementById("valuation-scatter").innerHTML = '<p style="color:var(--muted);font-size:12.5px;">No P/E data for current filters.</p>';
+  const note = document.getElementById("valuation-note");
+  if (pts.length) {
+    // direct-label the most-traded names plus the P/E extremes
+    const toLabel = new Set([
+      ...[...pts].sort((a,b) => b.size - a.size).slice(0, 6),
+      ...[...pts].sort((a,b) => b.y - a.y).slice(0, 2),
+      ...[...pts].sort((a,b) => a.y - b.y).slice(0, 2),
+    ]);
+    toLabel.forEach(p => { p.dlabel = p.ticker; });
+    const medPE = median(pts.map(p => p.y));
+    const medCap = median(pts.map(p => p.x));
+    scatterChart(document.getElementById("valuation-scatter"), pts, {
+      w: 1180, h: 400, xLog: true, yLog: true,
+      xfmt: (v) => fmtCompact(v), yfmt: (v) => v.toFixed(0) + "×",
+      refY: { v: medPE, label: `median P/E ${medPE.toFixed(0)}` },
+      refX: { v: medCap, label: `median cap ${fmtCompact(medCap)}` },
+      corners: [
+        { top: true,  text: "↑ high P/E — priced for growth" },
+        { top: false, text: "↓ low P/E — value territory" },
+      ],
+    });
+    note.textContent = omitted.length
+      ? `Not shown (no market-cap data from the last refresh): ${omitted.join(", ")}`
+      : "";
+  } else {
+    document.getElementById("valuation-scatter").innerHTML = '<p style="color:var(--muted);font-size:12.5px;">No P/E data for current filters.</p>';
+    note.textContent = "";
+  }
 }
 
 /* ---------------- trading activity ---------------- */
