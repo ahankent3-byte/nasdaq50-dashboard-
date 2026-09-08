@@ -1,0 +1,27 @@
+=== Monthly run starting 2026-08-01 ===
+Downloading 5y price history for 50 tickers + benchmark...
+Fetching fundamentals (sector, P/E, beta, market cap, 52w range, EPS, margins, analyst rating)...
+  10/50 done
+  20/50 done
+  30/50 done
+  40/50 done
+  50/50 done
+Wrote /Users/ahankent/project1/nasdaq50-dashboard/docs/index.html (2.33 MB)
+[main baf51bb] Monthly data refresh: 2026-08-01
+ 4 files changed, 3 insertions(+), 2 deletions(-)
+ create mode 100644 logs/monthly_run.err.log
+ create mode 100644 logs/monthly_run.log
+ 
+ To https://github.com/ahankent3-byte/nasdaq50-dashboard-.git
+   603c28f..baf51bb  main -> main
+
+Email sent: NASDAQ 50 Dashboard — Monthly Update (June 2026)
+=== Monthly run complete ===
+=== Monthly run starting 2026-09-01 ===
+Downloading 5y price history for 50 tickers + benchmark...
+Fetching fundamentals (sector, P/E, beta, market cap, 52w range, EPS, margins, analyst rating)...
+  10/50 done
+  20/50 done
+  30/50 done
+  40/50 done
+  50/50 done
