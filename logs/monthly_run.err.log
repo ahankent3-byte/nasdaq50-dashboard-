@@ -10,3 +10,68 @@ Traceback (most recent call last):
     assert d_dates == dates, f"date mismatch for {t}"
            ^^^^^^^^^^^^^^^^
 AssertionError: date mismatch for COST
+$INTU: possibly delisted; no price data found  (period=5y)
+[                       0%                       ]$PANW: possibly delisted; no price data found  (period=5y)
+[**                     4%                       ]  2 of 51 completed$GILD: possibly delisted; no price data found  (period=5y)
+[***                    6%                       ]  3 of 51 completed$AMAT: possibly delisted; no price data found  (period=5y)
+[****                   8%                       ]  4 of 51 completed$CDNS: possibly delisted; no price data found  (period=5y)
+[*****                 10%                       ]  5 of 51 completed$MSFT: possibly delisted; no price data found  (period=5y)
+[******                12%                       ]  6 of 51 completed$SNPS: possibly delisted; no price data found  (period=5y)
+$PYPL: possibly delisted; no price data found  (period=5y)
+[*******               14%                       ]  7 of 51 completed$LRCX: possibly delisted; no price data found  (period=5y)
+[********              16%                       ]  8 of 51 completed$AMZN: possibly delisted; no price data found  (period=5y)
+[*********             18%                       ]  9 of 51 completed$INTC: possibly delisted; no price data found  (period=5y)
+[**********            20%                       ]  10 of 51 completed$NVDA: possibly delisted; no price data found  (period=5y)
+[***********           22%                       ]  11 of 51 completed$MDLZ: possibly delisted; no price data found  (period=5y)
+[************          24%                       ]  12 of 51 completed$ADP: possibly delisted; no price data found  (period=5y)
+[************          25%                       ]  13 of 51 completed$TMUS: possibly delisted; no price data found  (period=5y)
+[*************         27%                       ]  14 of 51 completed$ISRG: possibly delisted; no price data found  (period=5y)
+[**************        29%                       ]  15 of 51 completed$ROP: possibly delisted; no price data found  (period=5y)
+[***************       31%                       ]  16 of 51 completed$CSX: possibly delisted; no price data found  (period=5y)
+[****************      33%                       ]  17 of 51 completed$COST: possibly delisted; no price data found  (period=5y)
+[*****************     35%                       ]  18 of 51 completed$TXN: possibly delisted; no price data found  (period=5y)
+[******************    37%                       ]  19 of 51 completed$AVGO: possibly delisted; no price data found  (period=5y)
+[*******************   39%                       ]  20 of 51 completed$AAPL: possibly delisted; no price data found  (period=5y)
+[********************  41%                       ]  21 of 51 completed$NFLX: possibly delisted; no price data found  (period=5y)
+[********************* 43%                       ]  22 of 51 completed$ADBE: possibly delisted; no price data found  (period=5y)
+[**********************45%                       ]  23 of 51 completed$AMD: possibly delisted; no price data found  (period=5y)
+[**********************47%                       ]  24 of 51 completed$QCOM: possibly delisted; no price data found  (period=5y)
+[**********************49%                       ]  25 of 51 completed$SBUX: possibly delisted; no price data found  (period=5y)
+[**********************51%                       ]  26 of 51 completed$MAR: possibly delisted; no price data found  (period=5y)
+[**********************53%                       ]  27 of 51 completed$TSLA: possibly delisted; no price data found  (period=5y)
+[**********************55%*                      ]  28 of 51 completed$ADI: possibly delisted; no price data found  (period=5y)
+[**********************57%**                     ]  29 of 51 completed$GOOGL: possibly delisted; no price data found  (period=5y)
+[**********************59%***                    ]  30 of 51 completed$BKNG: possibly delisted; no price data found  (period=5y)
+[**********************61%****                   ]  31 of 51 completed$CMCSA: possibly delisted; no price data found  (period=5y)
+[**********************63%*****                  ]  32 of 51 completed$KLAC: possibly delisted; no price data found  (period=5y)
+[**********************65%******                 ]  33 of 51 completed$CRWD: possibly delisted; no price data found  (period=5y)
+[**********************67%*******                ]  34 of 51 completed$VRTX: possibly delisted; no price data found  (period=5y)
+[**********************69%********               ]  35 of 51 completed$ORLY: possibly delisted; no price data found  (period=5y)
+[**********************71%*********              ]  36 of 51 completed$MU: possibly delisted; no price data found  (period=5y)
+[**********************73%**********             ]  37 of 51 completed$PCAR: possibly delisted; no price data found  (period=5y)
+[**********************75%***********            ]  38 of 51 completed$CSCO: possibly delisted; no price data found  (period=5y)
+[**********************76%***********            ]  39 of 51 completed$^IXIC: possibly delisted; no price data found  (period=5y)
+[**********************78%************           ]  40 of 51 completed$HON: possibly delisted; no price data found  (period=5y)
+[**********************80%*************          ]  41 of 51 completed$MELI: possibly delisted; no price data found  (period=5y)
+[**********************82%**************         ]  42 of 51 completed$AMGN: possibly delisted; no price data found  (period=5y)
+[**********************84%***************        ]  43 of 51 completed$MRVL: possibly delisted; no price data found  (period=5y)
+[**********************86%****************       ]  44 of 51 completed$NXPI: possibly delisted; no price data found  (period=5y)
+[**********************88%*****************      ]  45 of 51 completed$ABNB: possibly delisted; no price data found  (period=5y)
+[**********************90%******************     ]  46 of 51 completed$META: possibly delisted; no price data found  (period=5y)
+[**********************92%*******************    ]  47 of 51 completed$FTNT: possibly delisted; no price data found  (period=5y)
+[**********************94%********************   ]  48 of 51 completed$PEP: possibly delisted; no price data found  (period=5y)
+[**********************96%*********************  ]  49 of 51 completed$REGN: possibly delisted; no price data found  (period=5y)
+[**********************98%********************** ]  50 of 51 completed[*********************100%***********************]  51 of 51 completed
+
+51 Failed downloads:
+['INTU', 'PANW', 'GILD', 'AMAT', 'CDNS', 'MSFT', 'SNPS', 'PYPL', 'LRCX', 'AMZN', 'INTC', 'NVDA', 'MDLZ', 'ADP', 'TMUS', 'ISRG', 'ROP', 'CSX', 'COST', 'TXN', 'AVGO', 'AAPL', 'NFLX', 'ADBE', 'AMD', 'QCOM', 'SBUX', 'MAR', 'TSLA', 'ADI', 'GOOGL', 'BKNG', 'CMCSA', 'KLAC', 'CRWD', 'VRTX', 'ORLY', 'MU', 'PCAR', 'CSCO', '^IXIC', 'HON', 'MELI', 'AMGN', 'MRVL', 'NXPI', 'ABNB', 'META', 'FTNT', 'PEP', 'REGN']: possibly delisted; no price data found  (period=5y)
+Traceback (most recent call last):
+  File "/Users/ahankent/project1/nasdaq50-dashboard/scripts/monthly_run.py", line 147, in <module>
+    main()
+    ~~~~^^
+  File "/Users/ahankent/project1/nasdaq50-dashboard/scripts/monthly_run.py", line 122, in main
+    data = build_module.build_compact_dataset(price_data, fundamentals)
+  File "/Users/ahankent/project1/nasdaq50-dashboard/scripts/build.py", line 143, in build_compact_dataset
+    "asOf": dates[-1],
+            ~~~~~^^^^
+IndexError: list index out of range
